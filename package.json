@@ -1,6 +1,6 @@
 {
   "name": "git-env-vault",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "CLI + TUI for managing encrypted environment variables in monorepos with SOPS + age",
   "type": "module",
   "bin": {
@@ -28,6 +28,14 @@
     "prepare": "npm run build"
   },
   "keywords": ["cli", "sops", "age", "secrets", "env", "encryption", "monorepo", "git"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pas7-studio/git-env-vault"
+  },
+  "homepage": "https://github.com/pas7-studio/git-env-vault",
+  "bugs": {
+    "url": "https://github.com/pas7-studio/git-env-vault/issues"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
