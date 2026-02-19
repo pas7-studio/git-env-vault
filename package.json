@@ -61,7 +61,7 @@
     "@vitest/coverage-v8": "^1.2.0",
     "eslint": "^8.56.0",
     "@typescript-eslint/parser": "^6.19.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
     "prettier": "^3.2.4",
     "@types/node": "^20.11.0",
     "@types/js-yaml": "^4.0.9",
