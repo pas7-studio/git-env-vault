@@ -1,0 +1,68 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for git-env-vault
+title: '[Feature]: '
+labels: ['enhancement', 'needs-triage']
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out the sections below to help us understand your request.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of the feature you'd like to see.
+      placeholder: 'Add support for encrypting entire directories...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem does this feature solve? Why do you need it?
+      placeholder: |
+        Currently, I have to manually encrypt each file in my config directory.
+        This is time-consuming and error-prone when dealing with 50+ config files.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the solution you'd like to see implemented.
+      placeholder: |
+        Add a `gev encrypt-dir` command that recursively encrypts all files in a directory:
+        ```
+        gev encrypt-dir --path ./config --env prod
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: |
+        I could write a shell script, but having it built into gev would be more convenient.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add any other context, mockups, or examples about the feature request here.
+      placeholder: 'This is similar to how ansible-vault handles directory encryption...'
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: This feature would benefit the broader community, not just my use case
+          required: false

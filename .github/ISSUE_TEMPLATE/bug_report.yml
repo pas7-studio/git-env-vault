@@ -1,0 +1,96 @@
+name: 🐛 Bug Report
+description: Report a bug to help us improve git-env-vault
+title: '[Bug]: '
+labels: ['bug', 'needs-triage']
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please fill out the sections below.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of what the bug is.
+      placeholder: 'When I run `gev pull`, I get an error...'
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of @pas7/git-env-vault are you running?
+      placeholder: 'e.g., 0.1.5'
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Detailed steps to reproduce the behavior.
+      placeholder: |
+        1. Initialize project with `gev init`
+        2. Run `gev pull --env dev`
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: 'The secrets should be decrypted and written to .env files.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: A clear and concise description of what actually happened.
+      placeholder: 'Error: SOPS decryption failed...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error messages
+      description: Please paste any relevant log output. **Do NOT paste secret values!**
+      render: shell
+      placeholder: 'Run with DEBUG=* gev ... for verbose output'
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide your environment details.
+      placeholder: |
+        - OS: [e.g. macOS 14, Windows 11, Ubuntu 22.04]
+        - Node.js: [e.g. 20.10.0]
+        - SOPS version: [e.g. 3.8.1]
+        - age version: [e.g. 1.1.1]
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.
+      placeholder: 'This only happens in our CI pipeline, not locally...'
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked the [Troubleshooting Guide](../docs/TROUBLESHOOTING.md)
+          required: false
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true

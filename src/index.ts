@@ -1,2 +1,2 @@
-// Library entry point - placeholder
-export {}
+// Library entry point
+export * from './core/index.js'
