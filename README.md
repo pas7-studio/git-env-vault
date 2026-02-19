@@ -6,7 +6,8 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/pas7-studio/git-env-vault/ci.yml?logo=github&label=CI)](https://github.com/pas7-studio/git-env-vault/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/git-env-vault?logo=mit&label=license)](https://github.com/pas7-studio/git-env-vault/blob/main/LICENSE)
 [![Node](https://img.shields.io/node/v/git-env-vault?logo=node.js&label=node)](https://nodejs.org/)
-[![Maintainer](https://img.shields.io/badge/Maintainer-PAS7%20Studio-111827?logo=github&logoColor=white)](https://github.com/pas7-studio)
+[![Maintainer](https://img.shields.io/badge/Maintained%20by-PAS7%20Studio-ff6a00?style=for-the-badge&logo=github&logoColor=white&labelColor=111827)](https://pas7.com.ua)
+[![Website](https://img.shields.io/badge/Website-pas7.com.ua-111827?style=for-the-badge&logo=googlechrome&logoColor=white)](https://pas7.com.ua)
 
 Encrypted `.env` secrets in Git for monorepos. `SOPS + age`, policy-based access control, CLI, and interactive TUI.
 
@@ -175,10 +176,11 @@ npm run lint
 - [Support Guide](SUPPORT.md)
 - [Open an issue](https://github.com/pas7-studio/git-env-vault/issues)
 - [Security Policy](SECURITY.md)
+- [Website](https://pas7.com.ua)
 
 ## Maintainer
 
-Maintained by **PAS7 Studio**.
+Maintained by **[PAS7 Studio](https://pas7.com.ua)**.
 
 ## Funding
 
