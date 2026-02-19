@@ -1,401 +1,415 @@
 /**
- * .env file parser with support for comments, quotes, and managed blocks
- *
+ * Dotenv file parser
  * @module gev:core/env/parse-dotenv
- *
- * SECURITY: This module never logs or exposes secret values
+ * 
+ * Parses .env files while preserving:
+ * - Variable order
+ * - Comments (associated with variables)
+ * - Trailing comments
  */
 
-import * as fs from 'fs';
-import {
-  DotenvEntry,
-  DotenvFile,
-  ManagedBlock,
-  DuplicateKeyError,
-} from './types.js';
-
-/** Marker for managed block start */
-export const MANAGED_BLOCK_START = '# >>> gev:managed env=';
-/** Marker for managed block end */
-export const MANAGED_BLOCK_END = '# <<< gev:managed';
+import type { DotenvEntry, ParseResult, EnvObject, DotenvFile } from './types.js'
 
 /**
- * Regular expression for parsing .env lines
- * Supports: KEY=value, KEY="value", KEY='value', export KEY=value
+ * Managed block markers
  */
-const ENV_LINE_REGEX =
-  /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|([^#\n\r]*))?/;
+export const MANAGED_BLOCK_START = '# >>> ge-vault'
+export const MANAGED_BLOCK_END = '# <<< ge-vault'
 
 /**
- * Parse .env file content into structured format
- *
+ * Error thrown when duplicate keys are found
+ */
+export class DuplicateKeyError extends Error {
+  constructor(
+    public readonly key: string,
+    public readonly lineNumbers: number[]
+  ) {
+    super(`Duplicate key "${key}" found on lines: ${lineNumbers.join(', ')}`)
+    this.name = 'DuplicateKeyError'
+  }
+}
+
+/**
+ * Parse a dotenv file content into structured data
+ * 
  * @param content - Raw .env file content
- * @returns Parsed DotenvFile structure
- * @throws DuplicateKeyError if duplicate keys are found
+ * @returns Parsed result with env object, order, and entries
+ * 
+ * @example
+ * ```ts
+ * const result = parseDotenv(`
+ * # Database config
+ * DATABASE_URL=postgres://localhost:5432/db
+ * DEBUG=true
+ * `)
+ * // result.env = { DATABASE_URL: 'postgres://localhost:5432/db', DEBUG: 'true' }
+ * // result.order = ['DATABASE_URL', 'DEBUG']
+ * ```
  */
 export function parseDotenv(content: string): DotenvFile {
-  // Normalize line endings to LF
-  const normalizedContent = content.replace(/\r\n/g, '\n');
-  const lines = normalizedContent.split('\n');
-
-  const entries: DotenvEntry[] = [];
-  const rawLines: string[] = [];
-  const keyLineNumbers: Map<string, number[]> = new Map();
-
-  let currentComment = '';
-  let lineNumber = 0;
-
-  for (const line of lines) {
-    lineNumber++;
-    const trimmedLine = line.trim();
-
+  const lines = content.split(/\r?\n/)
+  const env: EnvObject = {}
+  const order: string[] = []
+  const entries: DotenvEntry[] = []
+  const rawLines: string[] = []
+  const keyLines: Map<string, number[]> = new Map()
+  
+  let currentComment = ''
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    const trimmedLine = line.trim()
+    const lineNumber = i + 1
+    
+    // Preserve raw lines
+    rawLines.push(line)
+    
     // Empty line
     if (trimmedLine === '') {
-      rawLines.push(line);
-      currentComment = '';
-      continue;
+      continue
     }
-
-    // Comment line
+    
+    // Comment line or managed block marker
     if (trimmedLine.startsWith('#')) {
-      // Check if this is a managed block marker
-      if (
-        trimmedLine.startsWith(MANAGED_BLOCK_START) ||
-        trimmedLine === MANAGED_BLOCK_END
-      ) {
-        rawLines.push(line);
-        currentComment = '';
-        continue;
+      const commentText = trimmedLine.slice(1).trim()
+      if (order.length === 0) {
+        // Before any variables - this is a leading comment
+        currentComment += (currentComment ? '\n' : '') + commentText
       }
-
-      // Regular comment - could be attached to next key
-      const commentText = trimmedLine.slice(1).trim();
-      if (currentComment) {
-        currentComment += '\n' + commentText;
-      } else {
-        currentComment = commentText;
-      }
-      rawLines.push(line);
-      continue;
+      continue
     }
-
-    // Try to parse as key=value
-    const match = line.match(ENV_LINE_REGEX);
-
-    if (match) {
-      const hasExport = line.startsWith('export ');
-      const key = match[1] as string;
-      let value: string;
-      let quote: '"' | "'" | null = null;
-
-      if (match[2] !== undefined) {
-        // Double-quoted value
-        value = unescapeQuotedValue(match[2]);
-        quote = '"';
-      } else if (match[3] !== undefined) {
-        // Single-quoted value
-        value = unescapeQuotedValue(match[3]);
-        quote = "'";
-      } else if (match[4] !== undefined) {
-        // Unquoted value - trim trailing whitespace and comments
-        let unquoted = match[4].trimEnd();
-        // Remove inline comment
-        const commentIndex = unquoted.indexOf(' #');
-        if (commentIndex !== -1) {
-          unquoted = unquoted.slice(0, commentIndex);
+    
+    // Variable line
+    const eqIndex = trimmedLine.indexOf('=')
+    if (eqIndex === -1) {
+      // No '=' - treat as empty value
+      const key = trimmedLine
+      if (key && !key.includes(' ')) {
+        // Check for duplicates
+        if (keyLines.has(key)) {
+          keyLines.get(key)!.push(lineNumber)
+          throw new DuplicateKeyError(key, keyLines.get(key)!)
         }
-        value = unquoted.trim();
-        quote = null;
-      } else {
-        // Empty value
-        value = '';
-        quote = null;
+        keyLines.set(key, [lineNumber])
+        
+        env[key] = ''
+        order.push(key)
+        entries.push({
+          key,
+          value: '',
+          comment: currentComment || undefined,
+          quote: 'none',
+          hasExport: false,
+          lineNumber
+        })
+        currentComment = ''
       }
-
-      const entry: DotenvEntry = {
-        key,
-        value,
-        hasExport,
-        quote,
-        rawLine: line,
-        lineNumber,
-      };
-
-      if (currentComment) {
-        entry.comment = currentComment;
-        currentComment = '';
-      }
-
-      entries.push(entry);
-
-      // Track line numbers for duplicate detection
-      const existing = keyLineNumbers.get(key);
-      if (existing) {
-        existing.push(lineNumber);
-      } else {
-        keyLineNumbers.set(key, [lineNumber]);
-      }
+      continue
+    }
+    
+    // Check for export prefix
+    let keyPart = trimmedLine.slice(0, eqIndex).trim()
+    let hasExport = false
+    if (keyPart.startsWith('export ')) {
+      hasExport = true
+      keyPart = keyPart.slice(7).trim()
+    }
+    
+    const key = keyPart
+    let rawValue = trimmedLine.slice(eqIndex + 1)
+    let value = rawValue
+    let quote: 'single' | 'double' | 'none' = 'none'
+    
+    // Handle quoted values
+    if (rawValue.startsWith('"') && rawValue.endsWith('"') && rawValue.length >= 2) {
+      quote = 'double'
+      value = rawValue.slice(1, -1)
+      // Handle escaped characters in double quotes
+      value = value
+        .replace(/\\n/g, '\n')
+        .replace(/\\t/g, '\t')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\')
+    } else if (rawValue.startsWith("'") && rawValue.endsWith("'") && rawValue.length >= 2) {
+      quote = 'single'
+      value = rawValue.slice(1, -1)
+      // Handle escaped single quotes in single-quoted values
+      value = value.replace(/\\'/g, "'")
     } else {
-      // Invalid line - treat as raw line
-      rawLines.push(line);
+      // Inline comment (only for unquoted values)
+      const commentIndex = value.indexOf(' #')
+      if (commentIndex !== -1) {
+        value = value.slice(0, commentIndex).trim()
+      }
     }
-  }
-
-  // Check for duplicates
-  for (const [key, lineNumbers] of keyLineNumbers) {
-    if (lineNumbers.length > 1) {
-      throw new DuplicateKeyError(key, lineNumbers);
+    
+    // Check for duplicates
+    if (keyLines.has(key)) {
+      keyLines.get(key)!.push(lineNumber)
+      throw new DuplicateKeyError(key, keyLines.get(key)!)
     }
+    keyLines.set(key, [lineNumber])
+    
+    env[key] = value
+    order.push(key)
+    entries.push({
+      key,
+      value,
+      comment: currentComment || undefined,
+      quote,
+      hasExport,
+      lineNumber
+    })
+    currentComment = ''
   }
-
+  
   return {
+    env,
+    order,
     entries,
-    rawLines,
-    originalContent: normalizedContent,
-  };
+    rawLines
+  }
 }
 
 /**
- * Parse .env file from filesystem
- *
- * @param filePath - Path to .env file
- * @returns Parsed DotenvFile structure
- * @throws DuplicateKeyError if duplicate keys are found
- * @throws Error if file cannot be read
+ * Parse a simple key=value string (no comments, no ordering)
+ * 
+ * @param content - Content to parse
+ * @returns Simple env object
  */
-export function parseDotenvFile(filePath: string): DotenvFile {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return parseDotenv(content);
+export function parseSimple(content: string): EnvObject {
+  const result: EnvObject = {}
+  const lines = content.split(/\r?\n/)
+  
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1) continue
+    
+    const key = trimmed.slice(0, eqIndex).trim()
+    const value = trimmed.slice(eqIndex + 1).trim()
+    
+    // Remove quotes
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      result[key] = value.slice(1, -1)
+    } else {
+      result[key] = value
+    }
+  }
+  
+  return result
 }
 
 /**
- * Unescape special characters in quoted values
- * Handles: \\, \n, \r, \t, \", \'
+ * Managed block info
  */
-function unescapeQuotedValue(value: string): string {
-  return value
-    .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\r')
-    .replace(/\\t/g, '\t')
-    .replace(/\\"/g, '"')
-    .replace(/\\'/g, "'")
-    .replace(/\\\\/g, '\\');
+export interface ManagedBlock {
+  env: string
+  service: string
+  entries: DotenvEntry[]
+  startIndex: number
+  endIndex: number
 }
 
 /**
  * Extract a managed block for a specific env and service
- *
- * @param content - Raw .env file content
+ * 
+ * @param content - File content
  * @param env - Environment name
  * @param service - Service name
- * @returns ManagedBlock if found, null otherwise
+ * @returns Managed block or null if not found
  */
 export function extractManagedBlock(
   content: string,
   env: string,
   service: string
 ): ManagedBlock | null {
-  const normalizedContent = content.replace(/\r\n/g, '\n');
-  const lines = normalizedContent.split('\n');
-
-  const startMarker = `${MANAGED_BLOCK_START}${env} service=${service}`;
-  const endMarker = MANAGED_BLOCK_END;
-
-  let startLine = -1;
-  let endLine = -1;
-
-  // Find the block markers
+  const lines = content.split(/\r?\n/)
+  // Support multiple marker formats:
+  // - # >>> ge-vault env=dev service=api
+  // - # >>> ge-vaultdev service=api (legacy format without space after ge-vault)
+  // - # >>> ge-vault dev service=api (with space)
+  const startMarkers = [
+    `${MANAGED_BLOCK_START} env=${env} service=${service}`,
+    `${MANAGED_BLOCK_START}${env} service=${service}`,
+    `${MANAGED_BLOCK_START} ${env} service=${service}`,
+  ]
+  
+  let startIndex = -1
+  let endIndex = -1
+  
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line !== undefined) {
-      const trimmed = line.trim();
-      if (trimmed === startMarker && startLine === -1) {
-        startLine = i + 1; // 1-based line number
-      } else if (trimmed === endMarker && startLine !== -1) {
-        endLine = i + 1; // 1-based line number
-        break;
-      }
+    const line = lines[i]!.trim()
+    if (startMarkers.includes(line)) {
+      startIndex = i
+    } else if (startIndex !== -1 && line === MANAGED_BLOCK_END) {
+      endIndex = i
+      break
     }
   }
-
-  if (startLine === -1 || endLine === -1) {
-    return null;
+  
+  if (startIndex === -1 || endIndex === -1) {
+    return null
   }
-
-  // Extract content between markers
-  const blockContent = lines.slice(startLine, endLine - 1).join('\n');
-
-  // Parse the block content
-  // We need a modified parser that doesn't throw on duplicates within managed blocks
-  const entries = parseManagedBlockContent(blockContent, startLine);
-
+  
+  // Parse entries between markers
+  const entries: DotenvEntry[] = []
+  for (let i = startIndex + 1; i < endIndex; i++) {
+    const line = lines[i]!.trim()
+    if (!line || line.startsWith('#')) continue
+    
+    const eqIndex = line.indexOf('=')
+    if (eqIndex !== -1) {
+      const key = line.slice(0, eqIndex).trim()
+      const rawValue = line.slice(eqIndex + 1)
+      let value = rawValue
+      let quote: 'single' | 'double' | 'none' = 'none'
+      
+      if (rawValue.startsWith('"') && rawValue.endsWith('"')) {
+        quote = 'double'
+        value = rawValue.slice(1, -1)
+      } else if (rawValue.startsWith("'") && rawValue.endsWith("'")) {
+        quote = 'single'
+        value = rawValue.slice(1, -1)
+      }
+      
+      entries.push({ key, value, quote })
+    }
+  }
+  
   return {
     env,
     service,
-    startLine,
-    endLine,
     entries,
-  };
-}
-
-/**
- * Parse managed block content (allows for simpler parsing)
- * This is more lenient than parseDotenv as it's for internal gev content
- */
-function parseManagedBlockContent(
-  content: string,
-  startLineNumber: number
-): DotenvEntry[] {
-  const lines = content.split('\n');
-  const entries: DotenvEntry[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line === undefined) continue;
-
-    const trimmedLine = line.trim();
-
-    // Skip empty lines and comments
-    if (trimmedLine === '' || trimmedLine.startsWith('#')) {
-      continue;
-    }
-
-    const match = line.match(ENV_LINE_REGEX);
-    if (match) {
-      const key = match[1] as string;
-      let value: string;
-      let quote: '"' | "'" | null = null;
-
-      if (match[2] !== undefined) {
-        value = unescapeQuotedValue(match[2]);
-        quote = '"';
-      } else if (match[3] !== undefined) {
-        value = unescapeQuotedValue(match[3]);
-        quote = "'";
-      } else if (match[4] !== undefined) {
-        value = match[4].trim();
-        quote = null;
-      } else {
-        value = '';
-        quote = null;
-      }
-
-      entries.push({
-        key,
-        value,
-        quote,
-        rawLine: line,
-        lineNumber: startLineNumber + i + 1,
-      });
-    }
+    startIndex,
+    endIndex
   }
-
-  return entries;
 }
 
 /**
  * Find all managed blocks in content
- *
- * @param content - Raw .env file content
- * @returns Array of ManagedBlock objects
+ * 
+ * @param content - File content
+ * @returns Array of managed blocks
  */
 export function findAllManagedBlocks(content: string): ManagedBlock[] {
-  const normalizedContent = content.replace(/\r\n/g, '\n');
-  const lines = normalizedContent.split('\n');
-  const blocks: ManagedBlock[] = [];
-
-  const startMarkerRegex = new RegExp(
-    `^${escapeRegex(MANAGED_BLOCK_START)}([^\\s]+)\\s+service=(.+)$`
-  );
-
+  const blocks: ManagedBlock[] = []
+  const lines = content.split(/\r?\n/)
+  
+  // Match both:
+  // - "# >>> ge-vault env=dev service=api" (with space after ge-vault)
+  // - "# >>> ge-vaultdev service=api" (without space, env directly appended)
+  const startPattern = new RegExp(`^${MANAGED_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s*\\S+.*)?$`)
+  
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line === undefined) continue;
-
-    const trimmed = line.trim();
-    const match = trimmed.match(startMarkerRegex);
-
+    const line = lines[i]!.trim()
+    const match = line.match(startPattern)
+    
     if (match) {
-      const env = match[1] as string;
-      const service = match[2] as string;
-      const startLine = i + 1;
-
-      // Find matching end marker
+      // Parse env and service from the marker
+      const params = match[1] || ''
+      let env = ''
+      let service = ''
+      
+      // Support formats:
+      // - "env=dev service=api"
+      // - "dev service=api"
+      // - "dev service=api" where dev is directly after ge-vault
+      const envMatch = params.match(/(?:env=)?(\w+)/)
+      const serviceMatch = params.match(/service=(\w+)/)
+      
+      if (envMatch) env = envMatch[1]!
+      if (serviceMatch) service = serviceMatch[1]!
+      
+      // Find end marker
       for (let j = i + 1; j < lines.length; j++) {
-        const endLine = lines[j];
-        if (endLine !== undefined && endLine.trim() === MANAGED_BLOCK_END) {
-          const blockEndLineNumber = j + 1;
-          const blockContent = lines.slice(startLine, blockEndLineNumber - 1).join('\n');
-          const entries = parseManagedBlockContent(blockContent, startLine);
-
+        if (lines[j]!.trim() === MANAGED_BLOCK_END) {
+          // Parse entries
+          const entries: DotenvEntry[] = []
+          for (let k = i + 1; k < j; k++) {
+            const entryLine = lines[k]!.trim()
+            if (!entryLine || entryLine.startsWith('#')) continue
+            
+            const eqIndex = entryLine.indexOf('=')
+            if (eqIndex !== -1) {
+              const key = entryLine.slice(0, eqIndex).trim()
+              const rawValue = entryLine.slice(eqIndex + 1)
+              let value = rawValue
+              let quote: 'single' | 'double' | 'none' = 'none'
+              
+              if (rawValue.startsWith('"') && rawValue.endsWith('"')) {
+                quote = 'double'
+                value = rawValue.slice(1, -1)
+              } else if (rawValue.startsWith("'") && rawValue.endsWith("'")) {
+                quote = 'single'
+                value = rawValue.slice(1, -1)
+              }
+              
+              entries.push({ key, value, quote })
+            }
+          }
+          
           blocks.push({
             env,
             service,
-            startLine,
-            endLine: blockEndLineNumber,
             entries,
-          });
-          break;
+            startIndex: i,
+            endIndex: j
+          })
+          
+          i = j
+          break
         }
       }
     }
   }
-
-  return blocks;
+  
+  return blocks
 }
 
 /**
- * Escape special regex characters
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Get all keys from a parsed .env file
- *
- * @param file - Parsed DotenvFile
+ * Get all keys from a parsed file
+ * 
+ * @param file - Parsed file
  * @returns Array of keys
  */
 export function getKeys(file: DotenvFile): string[] {
-  return file.entries.map((entry: DotenvEntry) => entry.key);
+  return file.entries.map(e => e.key)
 }
 
 /**
- * Check if a key exists in a parsed .env file
- *
- * @param file - Parsed DotenvFile
+ * Check if a key exists in the file
+ * 
+ * @param file - Parsed file
  * @param key - Key to check
- * @returns true if key exists
+ * @returns True if key exists
  */
 export function hasKey(file: DotenvFile, key: string): boolean {
-  return file.entries.some((entry: DotenvEntry) => entry.key === key);
+  return file.entries.some(e => e.key === key)
 }
 
 /**
- * Get a value by key from a parsed .env file
- *
- * SECURITY: The caller is responsible for not logging the returned value
- *
- * @param file - Parsed DotenvFile
+ * Get value for a key
+ * 
+ * @param file - Parsed file
  * @param key - Key to look up
- * @returns Value if found, undefined otherwise
+ * @returns Value or undefined
  */
 export function getValue(file: DotenvFile, key: string): string | undefined {
-  const entry = file.entries.find((e: DotenvEntry) => e.key === key);
-  return entry?.value;
+  const entry = file.entries.find(e => e.key === key)
+  return entry?.value
 }
 
 /**
- * Get an entry by key from a parsed .env file
- *
- * @param file - Parsed DotenvFile
+ * Get entry for a key
+ * 
+ * @param file - Parsed file
  * @param key - Key to look up
- * @returns DotenvEntry if found, undefined otherwise
+ * @returns Entry or undefined
  */
-export function getEntry(
-  file: DotenvFile,
-  key: string
-): DotenvEntry | undefined {
-  return file.entries.find((e: DotenvEntry) => e.key === key);
+export function getEntry(file: DotenvFile, key: string): DotenvEntry | undefined {
+  return file.entries.find(e => e.key === key)
 }

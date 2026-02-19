@@ -1,111 +1,125 @@
 /**
- * Types for .env file parsing and rendering
- *
+ * Types for environment variable handling
  * @module gev:core/env/types
  */
 
+import type { EnvObject } from '../types/index.js'
+
+// Re-export for convenience
+export type { EnvObject } from '../types/index.js'
+
 /**
- * Represents a single entry in a .env file
+ * Quote style for dotenv values
+ */
+export type QuoteStyle = 'single' | 'double' | 'none'
+
+/**
+ * A single entry in a dotenv file with optional metadata
  */
 export interface DotenvEntry {
-  /** The environment variable key */
-  key: string;
-  /** The environment variable value */
-  value: string;
-  /** Comment line(s) preceding the key */
-  comment?: string;
-  /** Whether this entry uses 'export KEY=value' format */
-  hasExport?: boolean;
-  /** Type of quotes used for the value */
-  quote?: '"' | "'" | null;
-  /** Original line content (for preserving format) */
-  rawLine?: string;
-  /** Line number in the original file (1-based) */
-  lineNumber?: number;
+  /** Variable name */
+  key: string
+  /** Variable value */
+  value: string
+  /** Optional comment above the variable */
+  comment?: string | undefined
+  /** Quote style for value */
+  quote?: QuoteStyle | undefined
+  /** Has export prefix */
+  hasExport?: boolean | undefined
+  /** Line number in file (1-based) */
+  lineNumber?: number | undefined
 }
 
 /**
- * Represents a parsed .env file structure
+ * Parsed dotenv file structure
  */
 export interface DotenvFile {
-  /** Parsed entries with keys */
-  entries: DotenvEntry[];
-  /** Raw lines without keys (comments, empty lines, invalid lines) */
-  rawLines: string[];
-  /** Original content for reference */
-  originalContent?: string;
+  /** Parsed environment variables as key-value pairs */
+  env: EnvObject
+  /** Original order of keys */
+  order: string[]
+  /** Parsed entries with full metadata */
+  entries: DotenvEntry[]
+  /** Raw lines from the file */
+  rawLines: string[]
+  /** Comments that appeared at the end of file */
+  trailingComments?: string[] | undefined
 }
 
 /**
- * Represents a managed block in a .env file
- * Managed blocks are automatically generated and maintained by gev
+ * Result of parsing a dotenv file (alias for DotenvFile for backward compatibility)
+ * @deprecated Use DotenvFile instead
  */
-export interface ManagedBlock {
-  /** Environment name (e.g., 'dev', 'staging', 'prod') */
-  env: string;
-  /** Service name */
-  service: string;
-  /** Start line number (1-based) */
-  startLine: number;
-  /** End line number (1-based) */
-  endLine: number;
-  /** Entries within this managed block */
-  entries: DotenvEntry[];
+export type ParseResult = DotenvFile
+
+/**
+ * Options for rendering dotenv content
+ */
+export interface RenderOptions {
+  /** Desired order of keys (if not specified, uses insertion order) */
+  order?: string[] | undefined
+  /** Header comment to add at the top */
+  header?: string | undefined
+  /** Whether to include comments from entries */
+  includeComments?: boolean | undefined
+  /** Position for inserting managed blocks */
+  position?: 'top' | 'bottom' | undefined
+  /** Show unchanged keys in diff */
+  showUnchanged?: boolean | undefined
+  /** Use compact format */
+  compact?: boolean | undefined
 }
 
 /**
- * Result of comparing two sets of environment entries
- * IMPORTANT: Never includes values to prevent secret leakage
+ * Result of diffing two environment objects
  */
 export interface DiffResult {
   /** Keys that were added */
-  added: string[];
+  added: string[]
   /** Keys that were removed */
-  removed: string[];
-  /** Keys whose values changed */
-  changed: string[];
-  /** Keys that remain unchanged */
-  unchanged: string[];
+  removed: string[]
+  /** Keys that had values changed */
+  changed: string[]
+  /** Keys that remained unchanged */
+  unchanged: string[]
 }
 
 /**
- * Options for inserting managed blocks
+ * Full diff with values (for unsafe display)
  */
-export interface InsertManagedBlockOptions {
-  /** Where to insert new blocks: 'top' or 'bottom' of file */
-  position?: 'top' | 'bottom';
+export interface DiffResultWithValues extends DiffResult {
+  /** Old values for changed keys */
+  oldValues: Record<string, string>
+  /** New values for changed keys */
+  newValues: Record<string, string>
 }
 
 /**
- * Error thrown when duplicate keys are found in .env file
+ * Options for formatting diff output
+ */
+export interface DiffFormatOptions {
+  /** Use colors in output */
+  colorize?: boolean | undefined
+  /** Show values (unsafe) */
+  showValues?: boolean | undefined
+  /** Indent string */
+  indent?: string | undefined
+  /** Show unchanged keys */
+  showUnchanged?: boolean | undefined
+  /** Use compact format */
+  compact?: boolean | undefined
+}
+
+/**
+ * Error thrown when duplicate keys are found in dotenv file
  */
 export class DuplicateKeyError extends Error {
   constructor(
-    public key: string,
-    public lineNumbers: number[]
+    public readonly key: string,
+    public readonly lineNumbers: number[]
   ) {
-    super(
-      `Duplicate key "${key}" found on lines ${lineNumbers.join(', ')}. ` +
-        `Please remove duplicates or use different key names.`
-    );
-    this.name = 'DuplicateKeyError';
-  }
-}
-
-/**
- * Error thrown when parsing fails
- */
-export class DotenvParseError extends Error {
-  constructor(
-    message: string,
-    public lineNumber?: number,
-    public line?: string
-  ) {
-    super(
-      lineNumber !== undefined
-        ? `Parse error on line ${lineNumber}: ${message}`
-        : `Parse error: ${message}`
-    );
-    this.name = 'DotenvParseError';
+    super(`Duplicate key "${key}" found on lines: ${lineNumbers.join(', ')}`)
+    this.name = 'DuplicateKeyError'
   }
 }

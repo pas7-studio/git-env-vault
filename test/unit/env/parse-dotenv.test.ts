@@ -13,8 +13,8 @@ import {
   getEntry,
   MANAGED_BLOCK_START,
   MANAGED_BLOCK_END,
+  DuplicateKeyError,
 } from '../../../src/core/env/parse-dotenv';
-import { DuplicateKeyError } from '../../../src/core/env/types';
 
 describe('parseDotenv', () => {
   describe('basic parsing', () => {
@@ -25,7 +25,7 @@ describe('parseDotenv', () => {
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0].key).toBe('KEY');
       expect(result.entries[0].value).toBe('value');
-      expect(result.entries[0].quote).toBeNull();
+      expect(result.entries[0].quote).toBe('none');
     });
 
     it('should parse KEY="value" with double quotes', () => {
@@ -35,7 +35,7 @@ describe('parseDotenv', () => {
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0].key).toBe('KEY');
       expect(result.entries[0].value).toBe('value');
-      expect(result.entries[0].quote).toBe('"');
+      expect(result.entries[0].quote).toBe('double');
     });
 
     it('should parse KEY=\'value\' with single quotes', () => {
@@ -45,7 +45,7 @@ describe('parseDotenv', () => {
       expect(result.entries).toHaveLength(1);
       expect(result.entries[0].key).toBe('KEY');
       expect(result.entries[0].value).toBe('value');
-      expect(result.entries[0].quote).toBe("'");
+      expect(result.entries[0].quote).toBe('single');
     });
 
     it('should parse export KEY=value', () => {
@@ -66,7 +66,7 @@ describe('parseDotenv', () => {
       expect(result.entries[0].key).toBe('KEY');
       expect(result.entries[0].value).toBe('value');
       expect(result.entries[0].hasExport).toBe(true);
-      expect(result.entries[0].quote).toBe('"');
+      expect(result.entries[0].quote).toBe('double');
     });
   });
 
@@ -97,7 +97,7 @@ describe('parseDotenv', () => {
       const result = parseDotenv(content);
 
       expect(result.entries[0].value).toBe('');
-      expect(result.entries[0].quote).toBe('"');
+      expect(result.entries[0].quote).toBe('double');
     });
 
     it('should unescape \\n in quoted values', () => {

@@ -28,12 +28,12 @@ describe('renderEntry', () => {
   });
 
   it('should render KEY="value" with double quotes', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'value', quote: '"' };
+    const entry: DotenvEntry = { key: 'KEY', value: 'value', quote: 'double' };
     expect(renderEntry(entry)).toBe('KEY="value"');
   });
 
   it('should render KEY=\'value\' with single quotes', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'value', quote: "'" };
+    const entry: DotenvEntry = { key: 'KEY', value: 'value', quote: 'single' };
     expect(renderEntry(entry)).toBe("KEY='value'");
   });
 
@@ -42,28 +42,28 @@ describe('renderEntry', () => {
       key: 'KEY',
       value: 'value',
       hasExport: true,
-      quote: '"',
+      quote: 'double',
     };
     expect(renderEntry(entry)).toBe('export KEY="value"');
   });
 
   it('should escape newlines in double-quoted values', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'line1\nline2', quote: '"' };
+    const entry: DotenvEntry = { key: 'KEY', value: 'line1\nline2', quote: 'double' };
     expect(renderEntry(entry)).toBe('KEY="line1\\nline2"');
   });
 
   it('should escape tabs in double-quoted values', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'col1\tcol2', quote: '"' };
+    const entry: DotenvEntry = { key: 'KEY', value: 'col1\tcol2', quote: 'double' };
     expect(renderEntry(entry)).toBe('KEY="col1\\tcol2"');
   });
 
   it('should escape double quotes in double-quoted values', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'say "hello"', quote: '"' };
+    const entry: DotenvEntry = { key: 'KEY', value: 'say "hello"', quote: 'double' };
     expect(renderEntry(entry)).toBe('KEY="say \\"hello\\""');
   });
 
   it('should escape backslashes in double-quoted values', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'path\\to\\file', quote: '"' };
+    const entry: DotenvEntry = { key: 'KEY', value: 'path\\to\\file', quote: 'double' };
     expect(renderEntry(entry)).toBe('KEY="path\\\\to\\\\file"');
   });
 
@@ -142,7 +142,7 @@ describe('renderManagedBlock', () => {
 
     const result = renderManagedBlock('dev', 'api', entries);
 
-    expect(result).toContain(`${MANAGED_BLOCK_START}dev service=api`);
+    expect(result).toContain(`${MANAGED_BLOCK_START} env=dev service=api`);
     expect(result).toContain(`${MANAGED_BLOCK_END}`);
     expect(result).toContain('API_KEY=secret123');
     expect(result).toContain('API_URL=https://api.example.com');
@@ -171,7 +171,7 @@ describe('renderManagedBlock', () => {
   it('should handle empty entries', () => {
     const result = renderManagedBlock('dev', 'api', []);
 
-    expect(result).toContain(`${MANAGED_BLOCK_START}dev service=api`);
+    expect(result).toContain(`${MANAGED_BLOCK_START} env=dev service=api`);
     expect(result).toContain(`${MANAGED_BLOCK_END}`);
   });
 });
@@ -184,7 +184,7 @@ describe('insertManagedBlock', () => {
     const result = insertManagedBlock(content, 'dev', 'api', entries);
 
     expect(result).toContain('EXISTING=value');
-    expect(result).toContain(`${MANAGED_BLOCK_START}dev service=api`);
+    expect(result).toContain(`${MANAGED_BLOCK_START} env=dev service=api`);
     expect(result).toContain('NEW_KEY=new_value');
   });
 
@@ -241,7 +241,7 @@ ${MANAGED_BLOCK_END}`;
     const result = insertManagedBlock(content, 'dev', 'api', apiEntries);
 
     // API block should be updated
-    expect(result).toContain(`${MANAGED_BLOCK_START}dev service=api`);
+    expect(result).toContain(`${MANAGED_BLOCK_START} env=dev service=api`);
     // WEB block should be preserved
     expect(result).toContain(`${MANAGED_BLOCK_START}dev service=web`);
     expect(result).toContain('WEB_KEY=old');
@@ -253,7 +253,7 @@ ${MANAGED_BLOCK_END}`;
 
     const result = insertManagedBlock(content, 'dev', 'api', entries);
 
-    expect(result).toContain(`${MANAGED_BLOCK_START}dev service=api`);
+    expect(result).toContain(`${MANAGED_BLOCK_START} env=dev service=api`);
     expect(result).toContain('KEY=value');
   });
 
@@ -358,18 +358,18 @@ describe('createEntry', () => {
     expect(entry.key).toBe('KEY');
     expect(entry.value).toBe('value');
     expect(entry.hasExport).toBe(false);
-    expect(entry.quote).toBeNull();
+    expect(entry.quote).toBe('none');
   });
 
   it('should create entry with options', () => {
     const entry = createEntry('KEY', 'value', {
       hasExport: true,
-      quote: '"',
+      quote: 'double',
       comment: 'A comment',
     });
 
     expect(entry.hasExport).toBe(true);
-    expect(entry.quote).toBe('"');
+    expect(entry.quote).toBe('double');
     expect(entry.comment).toBe('A comment');
   });
 });
@@ -387,14 +387,14 @@ describe('updateEntryValue', () => {
     const entry: DotenvEntry = { key: 'KEY', value: 'simple' };
     const updated = updateEntryValue(entry, 'has spaces');
 
-    expect(updated.quote).toBe('"');
+    expect(updated.quote).toBe('double');
   });
 
   it('should preserve existing quote style', () => {
-    const entry: DotenvEntry = { key: 'KEY', value: 'old', quote: "'" };
+    const entry: DotenvEntry = { key: 'KEY', value: 'old', quote: 'single' };
     const updated = updateEntryValue(entry, 'new');
 
-    expect(updated.quote).toBe("'");
+    expect(updated.quote).toBe('single');
   });
 });
 
