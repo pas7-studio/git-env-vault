@@ -6,6 +6,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/pas7-studio/git-env-vault/ci.yml?logo=github&label=CI)](https://github.com/pas7-studio/git-env-vault/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/git-env-vault?logo=mit&label=license)](https://github.com/pas7-studio/git-env-vault/blob/main/LICENSE)
 [![Node](https://img.shields.io/node/v/git-env-vault?logo=node.js&label=node)](https://nodejs.org/)
+[![Maintainer](https://img.shields.io/badge/Maintainer-PAS7%20Studio-111827?logo=github&logoColor=white)](https://github.com/pas7-studio)
 
 Encrypted `.env` secrets in Git for monorepos. `SOPS + age`, policy-based access control, CLI, and interactive TUI.
 
@@ -168,6 +169,21 @@ npm run build
 npm run test
 npm run lint
 ```
+
+## Support
+
+- [Support Guide](SUPPORT.md)
+- [Open an issue](https://github.com/pas7-studio/git-env-vault/issues)
+- [Security Policy](SECURITY.md)
+
+## Maintainer
+
+Maintained by **PAS7 Studio**.
+
+## Funding
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/pas7studio)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal&logoColor=white)](https://www.paypal.com/ncp/payment/KDSSNKK8REDM8)
 
 ## License
 
