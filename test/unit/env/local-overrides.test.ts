@@ -62,7 +62,11 @@ describe('getLocalOverridesPath', () => {
       service: 'api',
     });
 
-    expect(result).not.toContain('/');
+    // Path is absolute in home mode; assert only the repo segment is sanitized.
+    const repoSegment = path.basename(path.dirname(path.dirname(result)));
+    expect(repoSegment).toBe('my-repo_with_slashes');
+    expect(repoSegment).not.toContain('/');
+    expect(repoSegment).not.toContain('\\');
   });
 });
 
