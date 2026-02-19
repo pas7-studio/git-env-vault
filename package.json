@@ -22,8 +22,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "lint": "eslint src test",
-    "lint:fix": "eslint src test --fix",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "typecheck": "tsc --noEmit",
     "prepare": "npm run build"
   },

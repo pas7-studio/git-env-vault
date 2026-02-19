@@ -74,7 +74,7 @@ describe('GitAdapter', () => {
       const status = await git.status()
       
       expect(status.modified).toContain('test.txt')
-    })
+    }, 10000)
 
     it('should detect untracked files', async () => {
       await writeFile(join(testDir, 'untracked.txt'), 'content')

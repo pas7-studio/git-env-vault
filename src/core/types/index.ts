@@ -21,12 +21,8 @@ export interface EnvObject {
   [key: string]: string
 }
 
-// Diff результат
-export interface DiffResult {
-  added: string[]
-  removed: string[]
-  changed: string[]
-}
+// Diff результат - імпортуємо з env модуля для узгодження
+export type { DiffResult } from '../env/types.js'
 
 // Тимчасовий файл
 export interface TempFile {

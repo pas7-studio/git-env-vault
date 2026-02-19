@@ -9,6 +9,10 @@ import { grantCommand } from './commands/grant.js'
 import { revokeCommand } from './commands/revoke.js'
 import { rotateCommand } from './commands/rotate.js'
 import { updatekeysCommand } from './commands/updatekeys.js'
+import { promoteCommand, promoteAllCommand } from './commands/promote.js'
+import { hooksCommand } from './commands/hooks.js'
+import { wizardCommand } from './commands/wizard.js'
+import up from './commands/up.js'
 import { tuiCommand } from './commands/tui.js'
 
 const program = new Command()
@@ -31,6 +35,19 @@ program.addCommand(grantCommand)
 program.addCommand(revokeCommand)
 program.addCommand(rotateCommand)
 program.addCommand(updatekeysCommand)
+
+// Local overrides commands
+program.addCommand(promoteCommand)
+program.addCommand(promoteAllCommand)
+
+// Git hooks commands
+program.addCommand(hooksCommand)
+
+// Auto-configuration wizard
+program.addCommand(wizardCommand)
+
+// Docker convenience wrapper
+program.addCommand(up)
 
 // TUI mode (default when no args)
 program.addCommand(tuiCommand)
