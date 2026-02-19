@@ -42,7 +42,7 @@
     "fast-safe-stringify": "^2.1.1",
     "tweetnacl": "^1.0.3",
     "tmp-promise": "^3.0.3",
-    "ora": "^8.0.1",
+    "ora": "^9.3.0",
     "picocolors": "^1.0.0",
     "glob": "^10.3.10"
   },
