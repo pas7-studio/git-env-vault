@@ -37,10 +37,10 @@ jobs:
 
           while IFS= read -r file; do
             [ -z "$file" ] && continue
-            if [[ "$file" == src/* || "$file" == test/* || "$file" == package.json ]]; then
+            if [[ "$file" == src/* || "$file" == test/* ]]; then
               SRC_CHANGED=true
             fi
-            if [[ "$file" == src/* || "$file" == package.json ]]; then
+            if [[ "$file" == src/* ]]; then
               API_OR_FEATURE_CHANGED=true
             fi
             if [[ "$file" == README.md ]]; then
