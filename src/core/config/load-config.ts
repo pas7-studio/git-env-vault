@@ -22,6 +22,15 @@ export async function loadConfig(projectDir: string): Promise<EnvVaultConfig> {
       throw new ConfigError('services is required')
     }
 
+    if (
+      config.cryptoBackend !== undefined &&
+      !['auto', 'system-sops', 'js'].includes(config.cryptoBackend)
+    ) {
+      throw new ConfigError(
+        'cryptoBackend must be one of: auto, system-sops, js'
+      )
+    }
+
     return config
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -40,6 +49,7 @@ export function getDefaultConfig(): EnvVaultConfig {
   return {
     version: 1,
     secretsDir: 'secrets',
+    cryptoBackend: 'auto',
     services: {},
   }
 }

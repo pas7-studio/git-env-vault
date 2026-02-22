@@ -27,6 +27,7 @@ export const initCommand = new Command('init')
     // Create config
     const config = getDefaultConfig()
     config.secretsDir = options.secretsDir
+    config.cryptoBackend = 'auto'
     const configPath = join(cwd, 'envvault.config.json')
     
     try {

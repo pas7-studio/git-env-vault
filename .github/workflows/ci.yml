@@ -1,92 +1,166 @@
-name: Deploy Pipeline
+name: CI
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
-permissions:
-  contents: read
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   ci:
-    name: CI
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        node-version: [20]
-
+        node-version: [20, 22]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - name: Enforce changeset and README update policy
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.sha }}"
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          SRC_CHANGED=false
+          API_OR_FEATURE_CHANGED=false
+          README_CHANGED=false
+          CHANGESET_CHANGED=false
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if [[ "$file" == src/* || "$file" == test/* || "$file" == package.json ]]; then
+              SRC_CHANGED=true
+            fi
+            if [[ "$file" == src/* || "$file" == package.json ]]; then
+              API_OR_FEATURE_CHANGED=true
+            fi
+            if [[ "$file" == README.md ]]; then
+              README_CHANGED=true
+            fi
+            if [[ "$file" == .changeset/*.md ]]; then
+              CHANGESET_CHANGED=true
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [[ "$SRC_CHANGED" == "true" && "$CHANGESET_CHANGED" != "true" ]]; then
+            echo "ERROR: Source changes require a changeset file (.changeset/*.md)."
+            exit 1
+          fi
+
+          if [[ "$API_OR_FEATURE_CHANGED" == "true" && "$README_CHANGED" != "true" ]]; then
+            echo "ERROR: API/feature changes require README.md update."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-
-      - name: Build
-        run: npm run build --if-present
-
-      - name: Lint
-        run: npm run lint --if-present
-
-      - name: CI Verify
-        run: npm run ci:verify --if-present
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
 
   release:
-    name: Create GitHub Release
-    needs: ci
+    name: Release and Publish
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
-
+      pull-requests: write
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Create Release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+      - name: Detect pending changesets
+        id: changesets
+        shell: bash
+        run: |
+          count=$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          if [ "$count" -gt 0 ]; then
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Version packages from changesets
+        if: steps.changesets.outputs.has_changesets == 'true'
+        run: npm run version-packages
+
+      - name: Commit and push version changes
+        if: steps.changesets.outputs.has_changesets == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): version packages [skip ci]"
+          git push origin HEAD:main
+
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          name=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).name")
+          version=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check if npm version already exists
+        id: npm
+        shell: bash
+        run: |
+          if npm view "${{ steps.version.outputs.name }}@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create git tag
+        if: steps.npm.outputs.should_publish == 'true'
+        shell: bash
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.value }}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          git tag "v${{ steps.version.outputs.value }}"
+          git push origin "v${{ steps.version.outputs.value }}"
+
+      - name: Create GitHub Release
+        if: steps.npm.outputs.should_publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.value }}
           generate_release_notes: true
 
-  npm_publish:
-    name: Publish to npm
-    needs: release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        if: steps.npm.outputs.should_publish == 'true'
+        run: npm run release
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

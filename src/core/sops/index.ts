@@ -1,2 +1,6 @@
 export * from './sops-adapter.js'
 export * from './sops-config-gen.js'
+export * from './crypto-backend.js'
+export * from './system-sops-backend.js'
+export * from './js-sops-age-backend.js'
+export * from './backend-selection.js'

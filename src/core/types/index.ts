@@ -2,6 +2,7 @@
 export interface EnvVaultConfig {
   version: 1
   secretsDir: string
+  cryptoBackend?: 'auto' | 'system-sops' | 'js'
   services: Record<string, { envOutput: string }>
 }
 

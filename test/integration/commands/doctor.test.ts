@@ -44,6 +44,16 @@ describe('doctor command', () => {
       expect(result.stdout).toContain('SOPS')
     })
 
+    it('should print capability matrix', async () => {
+      const result = await execa('node', [CLI_PATH, 'doctor'], {
+        cwd: testDir,
+        reject: false
+      })
+
+      expect(result.stdout).toContain('Capability Matrix')
+      expect(result.stdout).toContain('pull/decrypt')
+    })
+
     it('should check for AGE key', async () => {
       const result = await execa('node', [CLI_PATH, 'doctor'], {
         cwd: testDir,

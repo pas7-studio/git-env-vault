@@ -11,6 +11,8 @@
 
 Encrypted `.env` secrets in Git for monorepos. `SOPS + age`, policy-based access control, CLI, and interactive TUI.
 
+Now includes a JS decrypt backend fallback for smoother onboarding (`pull`/decrypt) while keeping system `sops` + `age` as the primary full-featured workflow.
+
 ## Why git-env-vault
 
 Managing secrets across multiple services and environments is hard:
@@ -37,8 +39,8 @@ Managing secrets across multiple services and environments is hard:
 
 - Node.js `18+`
 - Git `2+`
-- [SOPS](https://github.com/getsops/sops) `3.8+`
-- [age](https://github.com/FiloSottile/age) `1.1+`
+- [SOPS](https://github.com/getsops/sops) `3.8+` (recommended, required for full feature set)
+- [age](https://github.com/FiloSottile/age) `1.1+` (recommended, required for full feature set)
 
 ## Installation
 
@@ -50,17 +52,76 @@ npm i -D git-env-vault
 npm i -g git-env-vault
 ```
 
-## Quick start
+## Install prerequisites by OS (full mode)
 
-### 1) Install SOPS and age
+Use this if you want the full feature set (`edit`, `set`, `grant`, `revoke`, `updatekeys`, `rotate`).
+
+### Windows (winget)
+
+```powershell
+# Node.js LTS + Git
+winget install --id OpenJS.NodeJS.LTS -e
+winget install --id Git.Git -e
+
+# SOPS + age
+winget install --id Mozilla.SOPS -e
+winget install --id FiloSottile.age -e
+```
+
+### macOS (Homebrew)
 
 ```bash
-# macOS
-brew install sops age
+# Install Homebrew first if needed: https://brew.sh
 
-# Windows (winget)
-winget install sops
-winget install age
+# Node.js + Git
+brew install node git
+
+# SOPS + age
+brew install sops age
+```
+
+### Linux (Debian / Ubuntu)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y nodejs npm git sops age
+```
+
+### Linux (Fedora / RHEL)
+
+```bash
+sudo dnf install -y nodejs npm git sops age
+```
+
+### Linux (Arch)
+
+```bash
+sudo pacman -S --needed nodejs npm git sops age
+```
+
+### Generate age key (all OS)
+
+```bash
+# Linux/macOS
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt
+```
+
+```powershell
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force "$env:APPDATA\\sops\\age" | Out-Null
+age-keygen -o "$env:APPDATA\\sops\\age\\keys.txt"
+```
+
+## Quick start (easy mode, no system SOPS required for `pull`)
+
+### 1) Install package
+
+```bash
+npm i -D git-env-vault
+
+# optional: prefer JS backend for basic usage
+# set "cryptoBackend": "js" in envvault.config.json
 ```
 
 ### 2) Create your age key
@@ -82,13 +143,46 @@ Generated files:
 - `.sops.yaml`
 - `secrets/`
 
-### 4) Grant access
+### 4) Decrypt secrets (`pull`)
+
+```bash
+envvault pull --env dev
+```
+
+If system `sops` is missing, `envvault` will try the JS backend automatically in `cryptoBackend: "auto"` mode.
+
+### 5) Full mode (recommended for teams / production workflows)
+
+Install system tools to enable editing and key management:
+
+```bash
+# macOS
+brew install sops age
+
+# Windows (winget)
+winget install --id Mozilla.SOPS -e
+winget install --id FiloSottile.age -e
+
+# Linux examples
+sudo apt-get install -y sops age
+sudo dnf install sops age
+sudo pacman -S sops age
+```
+
+Use built-in guidance:
+
+```bash
+envvault setup
+envvault doctor --fix
+```
+
+### 6) Grant access (full mode)
 
 ```bash
 envvault grant --env dev --service api --recipient age1...
 ```
 
-### 5) Work with secrets
+### 7) Work with secrets
 
 ```bash
 # interactive mode
@@ -99,11 +193,45 @@ envvault edit --env dev --service api
 envvault pull --env dev
 ```
 
-### 6) CI check
+### 8) CI check
 
 ```bash
 envvault ci-verify
 ```
+
+## Crypto backends
+
+`envvault.config.json` supports:
+
+```json
+{
+  "cryptoBackend": "auto"
+}
+```
+
+- `auto` (default): try system `sops` first, then JS fallback for supported commands
+- `system-sops`: require system `sops` binary
+- `js`: force JS backend (basic decrypt/pull only)
+
+### Backend capability matrix
+
+| Command / capability | JS backend (`sops-age`) | System SOPS |
+| --- | --- | --- |
+| `pull` / decrypt | Yes | Yes |
+| `doctor` capability detection | Yes (reported) | Yes |
+| `edit` | No | Yes |
+| `set` | No | Yes |
+| `grant` | No | Yes |
+| `revoke` | No | Yes |
+| `updatekeys` | No | Yes |
+| `rotate` | No | Yes |
+
+### Limitations of JS backend
+
+- Intended for decrypt flows (`pull`) only.
+- Does not replace system `sops` for write/re-encrypt/key-rotation operations.
+- Output formatting may differ from `sops -d` when using `decryptToString`.
+- Best used for onboarding/local read-only workflows; keep system `sops` + `age` for production maintenance.
 
 ## Documentation
 
@@ -143,6 +271,7 @@ envvault ci-verify
 - `envvault hooks install --type pre-push|pre-commit`
 - `envvault hooks uninstall --type pre-push|pre-commit`
 - `envvault hooks status`
+- `envvault setup`
 - `envvault wizard`
 - `envvault up --env <env>`
 - `envvault ci-verify [--allow-unsigned]`

@@ -48,12 +48,14 @@ describe('loadConfig', () => {
       const config = {
         version: 1 as const,
         secretsDir: 'vault',
+        cryptoBackend: 'js' as const,
         services: {}
       }
       await writeFile(join(testDir, 'envvault.config.json'), JSON.stringify(config))
       
       const loaded = await loadConfig(testDir)
       expect(loaded.secretsDir).toBe('vault')
+      expect(loaded.cryptoBackend).toBe('js')
     })
   })
 
@@ -102,6 +104,14 @@ describe('loadConfig', () => {
       await expect(loadConfig(testDir)).rejects.toThrow('services is required')
     })
 
+    it('should throw ConfigError on invalid cryptoBackend', async () => {
+      await writeFile(
+        join(testDir, 'envvault.config.json'),
+        '{"version":1,"secretsDir":"secrets","cryptoBackend":"broken","services":{}}'
+      )
+      await expect(loadConfig(testDir)).rejects.toThrow('cryptoBackend must be one of')
+    })
+
     it('should throw ConfigError on null services', async () => {
       await writeFile(join(testDir, 'envvault.config.json'), '{"version":1,"secretsDir":"secrets","services":null}')
       await expect(loadConfig(testDir)).rejects.toThrow('services is required')
@@ -115,6 +125,7 @@ describe('getDefaultConfig', () => {
     
     expect(config.version).toBe(1)
     expect(config.secretsDir).toBe('secrets')
+    expect(config.cryptoBackend).toBe('auto')
     expect(config.services).toEqual({})
   })
 

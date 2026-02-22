@@ -14,6 +14,7 @@ import { hooksCommand } from './commands/hooks.js'
 import { wizardCommand } from './commands/wizard.js'
 import up from './commands/up.js'
 import { tuiCommand } from './commands/tui.js'
+import { setupCommand } from './commands/setup.js'
 
 const program = new Command()
 
@@ -28,6 +29,7 @@ program.addCommand(pullCommand)
 program.addCommand(editCommand)
 program.addCommand(setCommand)
 program.addCommand(doctorCommand)
+program.addCommand(setupCommand)
 program.addCommand(ciVerifyCommand)
 
 // Admin commands
