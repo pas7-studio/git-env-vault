@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- 51b27e0: Add monorepo DX improvements: `gitignore check/fix`, `refresh`, `diff`, `pull --confirm` with safe key-only diffs and selective updates, plus bug fixes for `grant`, `pull --no-write`, Windows `.sops.yaml` regexes, and correct CLI version output.
+
 ## 0.4.0
 
 ### Minor Changes
