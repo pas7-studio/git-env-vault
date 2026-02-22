@@ -191,6 +191,8 @@ envvault tui
 # or direct commands
 envvault edit --env dev --service api
 envvault pull --env dev
+envvault pull --env dev --service api --confirm
+envvault diff --env dev --service api
 ```
 
 ### 8) CI check
@@ -233,6 +235,70 @@ envvault ci-verify
 - Output formatting may differ from `sops -d` when using `decryptToString`.
 - Best used for onboarding/local read-only workflows; keep system `sops` + `age` for production maintenance.
 
+## Monorepo DX (v0.5.0)
+
+### Gitignore management
+
+```bash
+envvault gitignore check
+envvault gitignore fix
+envvault gitignore fix --dry-run
+```
+
+### Refresh / rescan monorepo env files
+
+```bash
+# preview changes (config/schema only)
+envvault refresh --dry-run
+
+# add extra excludes
+envvault refresh --dry-run --exclude "apps/legacy/**"
+
+# write config + schema
+envvault refresh
+
+# optional: create encrypted secrets snapshots (requires system SOPS)
+envvault refresh --write-secrets
+```
+
+What `refresh` updates:
+- `envvault.config.json` (`services` map)
+- `envvault.schema.yaml` (keys per service)
+
+What `refresh` does not do:
+- does not overwrite local `.env` files
+- preserves existing `secretsDir` / `cryptoBackend` config settings
+
+### Safe diff + confirm for pull
+
+```bash
+# preview key changes before writing local .env
+envvault pull --env dev --service api --confirm
+
+# non-interactive apply (CI/automation)
+envvault pull --env dev --service api --confirm --yes
+
+# apply only selected changed keys (comma-separated)
+envvault pull --env dev --service api --confirm --select-keys DATABASE_URL,REDIS_URL
+
+# show secret values in diff (unsafe)
+envvault pull --env dev --service api --confirm --unsafe-show-values
+```
+
+By default, diffs show only key names (`added/removed/changed`), not values.
+
+### Compare local env vs vault (no write)
+
+```bash
+envvault diff --env dev --service api
+envvault diff --env dev --service api --unsafe-show-values
+```
+
+### Non-interactive flags
+
+- `pull --confirm --yes`
+- `set --confirm --yes`
+
 ## Documentation
 
 - [Getting Started](docs/GETTING-STARTED.md)
@@ -250,6 +316,8 @@ envvault ci-verify
 
 - `envvault init`
 - `envvault pull --env <env> [--service <service>]`
+- `envvault diff --env <env> --service <service>`
+- `envvault refresh [--dry-run] [--write-secrets]`
 - `envvault edit --env <env> --service <service>`
 - `envvault set --env <env> --service <service> KEY=VALUE...`
 - `envvault doctor`
@@ -271,6 +339,8 @@ envvault ci-verify
 - `envvault hooks install --type pre-push|pre-commit`
 - `envvault hooks uninstall --type pre-push|pre-commit`
 - `envvault hooks status`
+- `envvault gitignore check`
+- `envvault gitignore fix [--dry-run]`
 - `envvault setup`
 - `envvault wizard`
 - `envvault up --env <env>`
@@ -299,6 +369,11 @@ npm run build
 npm run test
 npm run lint
 ```
+
+## Cross-platform notes
+
+- `.sops.yaml` creation rules use a path-separator-safe regex (`[\\/]`) for Windows/macOS/Linux compatibility.
+- `envvault setup` prints OS-specific install commands for `sops` + `age`.
 
 ## Support
 

@@ -16,6 +16,10 @@ export interface SopsConfig {
   creation_rules: SopsCreationRule[]
 }
 
+function escapeRegexLiteral(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * Generate .sops.yaml from envvault.policy.json
  */
@@ -27,7 +31,7 @@ export function generateSopsConfig(policy: EnvVaultPolicy): SopsConfig {
       const recipients = serviceConfig.recipients
       if (recipients.length === 0) continue
 
-      const pathRegex = `^secrets/${envName}/${serviceName}\\.sops\\.yaml$`
+      const pathRegex = `^secrets[\\\\/]${escapeRegexLiteral(envName)}[\\\\/]${escapeRegexLiteral(serviceName)}\\.sops\\.yaml$`
       
       rules.push({
         path_regex: pathRegex,

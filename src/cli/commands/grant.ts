@@ -1,13 +1,13 @@
 import { Command } from 'commander'
+import { access, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { readFile, writeFile, mkdir } from 'fs/promises'
 import {
   loadConfig,
   loadPolicy,
   SopsAdapter,
   GitAdapter,
   writeSopsConfig,
-  withLock
+  withLock,
 } from '../../core/index.js'
 
 export const grantCommand = new Command('grant')
@@ -18,72 +18,76 @@ export const grantCommand = new Command('grant')
   .option('--no-commit', 'Skip git commit')
   .action(async (options) => {
     const cwd = process.cwd()
-    
+
     const config = await loadConfig(cwd)
     const policy = await loadPolicy(cwd)
     const sops = new SopsAdapter()
     const git = new GitAdapter(cwd)
-    
+
     const { env, service, recipient } = options
-    
-    // Validate environment exists
+
     if (!policy.environments[env]) {
-      console.error(`❌ Environment '${env}' not found in policy`)
+      console.error(`Error: Environment '${env}' not found in policy`)
       process.exit(1)
     }
-    
-    // Validate service exists in config
+
     if (!config.services[service]) {
-      console.error(`❌ Service '${service}' not found in config`)
+      console.error(`Error: Service '${service}' not found in config`)
       process.exit(1)
     }
-    
-    // Initialize service policy if not exists
+
     if (!policy.environments[env].services[service]) {
       policy.environments[env].services[service] = { recipients: [] }
     }
-    
-    // Check if recipient already has access
+
     if (policy.environments[env].services[service].recipients.includes(recipient)) {
-      console.log(`ℹ️  Recipient already has access to ${env}/${service}`)
+      console.log(`Recipient already has access to ${env}/${service}`)
       return
     }
-    
+
     await withLock(cwd, async () => {
-      // Add recipient to policy
       policy.environments[env]!.services[service]!.recipients.push(recipient)
-      
-      // Save updated policy
+
       const policyPath = join(cwd, 'envvault.policy.json')
       await writeFile(policyPath, JSON.stringify(policy, null, 2), 'utf-8')
-      console.log(`✅ Added recipient to policy`)
-      
-      // Update .sops.yaml
+      console.log('Added recipient to policy')
+
       await writeSopsConfig(cwd, policy)
-      console.log(`✅ Updated .sops.yaml`)
-      
-      // Re-encrypt existing secrets with new recipient
+      console.log('Updated .sops.yaml')
+
       const secretPath = join(cwd, config.secretsDir, env, `${service}.sops.yaml`)
+      let secretExists = false
       try {
-        await sops.updateKeys(secretPath)
-        console.log(`✅ Re-encrypted secrets with new recipient`)
+        await access(secretPath)
+        secretExists = true
       } catch {
-        console.log(`ℹ️  No existing secrets to re-encrypt`)
+        secretExists = false
       }
-      
-      // Commit changes
+
+      if (secretExists) {
+        try {
+          await sops.updateKeys(secretPath)
+          console.log('Re-encrypted secrets with new recipient')
+        } catch {
+          console.log('Warning: Could not re-encrypt existing secret file')
+        }
+      } else {
+        console.log('No existing secret file to re-encrypt (policy updated only)')
+      }
+
       if (options.commit && (await git.isRepo())) {
+        const filesToAdd = [policyPath, join(cwd, '.sops.yaml')]
+        if (secretExists) {
+          filesToAdd.push(secretPath)
+        }
+
         const commitHash = await git.commit({
           message: `chore(policy): grant access to ${env}/${service}`,
-          add: [
-            policyPath,
-            join(cwd, '.sops.yaml'),
-            secretPath
-          ]
+          add: filesToAdd,
         })
-        console.log(`✅ Committed: ${commitHash}`)
+        console.log(`Committed: ${commitHash}`)
       }
     })
-    
-    console.log(`\n🎉 Granted access to ${env}/${service}`)
+
+    console.log(`\nGranted access to ${env}/${service}`)
   })

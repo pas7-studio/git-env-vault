@@ -80,7 +80,24 @@ describe('generateSopsConfig', () => {
       const config = generateSopsConfig(policy)
       const rule = config.creation_rules.find(r => r.path_regex.includes('my-service'))
       
-      expect(rule?.path_regex).toBe('^secrets/dev/my-service\\.sops\\.yaml$')
+      expect(rule?.path_regex).toBe('^secrets[\\\\/]dev[\\\\/]my-service\\.sops\\.yaml$')
+    })
+
+    it('should generate cross-platform path regex with path separator class', () => {
+      const policy: EnvVaultPolicy = {
+        version: 1,
+        environments: {
+          dev: {
+            services: {
+              api: { recipients: ['age1abc'] }
+            }
+          }
+        }
+      }
+
+      const config = generateSopsConfig(policy)
+      const rule = config.creation_rules.find(r => r.path_regex.includes('api'))
+      expect(rule?.path_regex).toContain('[\\\\/]')
     })
 
     it('should include all recipients in key group', () => {
