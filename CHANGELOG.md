@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- 4dd4bd0: Add crypto backend abstraction with JS fallback for `pull`/decrypt, improve `doctor` capability diagnostics, and add `envvault setup` guidance.
+
 All notable changes to `@pas7/git-env-vault` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
