@@ -222,8 +222,8 @@ export async function checkHooksStatus(options?: {
 }): Promise<{
   prePush: boolean
   preCommit: boolean
-  prePushPath?: string
-  preCommitPath?: string
+  prePushPath?: string | undefined
+  preCommitPath?: string | undefined
 }> {
   const cwd = options?.cwd ?? process.cwd()
   const gitDir = await findGitDirectory(cwd)
