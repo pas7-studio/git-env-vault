@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enforce changeset and README update policy
+      - name: Enforce README update policy
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
@@ -33,8 +33,6 @@ jobs:
           SRC_CHANGED=false
           API_OR_FEATURE_CHANGED=false
           README_CHANGED=false
-          CHANGESET_CHANGED=false
-
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             if [[ "$file" == src/* || "$file" == test/* ]]; then
@@ -46,15 +44,7 @@ jobs:
             if [[ "$file" == README.md ]]; then
               README_CHANGED=true
             fi
-            if [[ "$file" == .changeset/*.md ]]; then
-              CHANGESET_CHANGED=true
-            fi
           done <<< "$CHANGED_FILES"
-
-          if [[ "$SRC_CHANGED" == "true" && "$CHANGESET_CHANGED" != "true" ]]; then
-            echo "ERROR: Source changes require a changeset file (.changeset/*.md)."
-            exit 1
-          fi
 
           if [[ "$API_OR_FEATURE_CHANGED" == "true" && "$README_CHANGED" != "true" ]]; then
             echo "ERROR: API/feature changes require README.md update."
@@ -97,31 +87,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
-
-      - name: Detect pending changesets
-        id: changesets
-        shell: bash
-        run: |
-          count=$(find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
-          if [ "$count" -gt 0 ]; then
-            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Version packages from changesets
-        if: steps.changesets.outputs.has_changesets == 'true'
-        run: npm run version-packages
-
-      - name: Commit and push version changes
-        if: steps.changesets.outputs.has_changesets == 'true'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore(release): version packages [skip ci]"
-          git push origin HEAD:main
 
       - name: Read package version
         id: version

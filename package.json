@@ -1,6 +1,6 @@
 {
   "name": "git-env-vault",
-  "version": "0.5.0",
+  "version": "0.6.2",
   "description": "CLI + TUI for managing encrypted environment variables in monorepos with SOPS + age",
   "type": "module",
   "bin": {
