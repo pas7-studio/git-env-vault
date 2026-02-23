@@ -54,7 +54,21 @@ async function confirmYesNo(prompt: string, yes?: boolean): Promise<boolean> {
   return answer === 'y' || answer === 'yes'
 }
 
-function createPlanObject(service: string, env: string, diff: ReturnType<typeof diffEnv>) {
+function createPlanObject(
+  service: string,
+  env: string,
+  diff: ReturnType<typeof diffEnv>
+): {
+  command: 'push'
+  env: string
+  service: string
+  summary: {
+    added: number
+    removed: number
+    changed: number
+  }
+  diff: ReturnType<typeof diffEnv>
+} {
   return {
     command: 'push',
     env,
@@ -215,4 +229,3 @@ export const pushCommand = new Command('push')
       throw error
     }
   })
-
