@@ -1,4 +1,4 @@
-﻿# CLI Reference
+# CLI Reference
 
 This document describes all available `envvault` CLI commands.
 
@@ -277,3 +277,4 @@ envvault ci-unseal --payload "$ENVVAULT_CI_BLOB" --out apps/api/.env --validate-
 - [Configuration](./CONFIGURATION.md)
 - [Workflows](./WORKFLOWS.md)
 - [Security Guide](./SECURITY-GUIDE.md)
+

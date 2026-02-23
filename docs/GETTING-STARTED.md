@@ -1,84 +1,131 @@
-﻿# Getting Started
+# Getting Started
 
-This guide walks you through setting up `git-env-vault` in a new or existing repository.
+This guide is the fastest path to set up `git-env-vault` and start using it safely.
 
-## Prerequisites
+Read this first. Then continue with:
+- [Workflows](./WORKFLOWS.md) for real team/CI scenarios
+- [CLI Reference](./CLI-REFERENCE.md) for full command options
 
-- Node.js `18+`
-- Git `2+`
-- [SOPS](https://github.com/getsops/sops) `3.8+`
-- [age](https://github.com/FiloSottile/age) `1.1+`
+## Quick Path (developer, local usage)
 
-## 1) Install dependencies
+If you only need to pull local `.env` files and start working:
+
+1. Install package
+```bash
+npm i -D git-env-vault
+```
+
+2. Initialize repo (once)
+```bash
+envvault init
+```
+
+3. Pull secrets
+```bash
+envvault pull --env dev
+```
+
+If system `sops` is not installed, `pull` can use the JS backend fallback in many cases.
+
+## Install Options
+
+### Local dependency (recommended)
 
 ```bash
 npm i -D git-env-vault
 ```
 
-Run without installing globally:
+### Run without installing (`npx` / `bunx`)
 
 ```bash
 npx git-env-vault@latest doctor
 bunx git-env-vault@latest doctor
 ```
 
-Global install (optional):
+### Global install (optional)
 
 ```bash
 npm i -g git-env-vault
 envvault --version
 ```
 
-Install external tools:
+## Full Setup (admins / write access / production maintenance)
+
+Install system `sops` + `age` if you need:
+- `edit`
+- `set`
+- `grant`
+- `revoke`
+- `updatekeys`
+- `rotate`
+- `push`
+
+### OS install commands
 
 ```bash
 # macOS
 brew install sops age
 
-# Windows
-winget install sops
-winget install age
+# Linux (Debian/Ubuntu)
+sudo apt-get update && sudo apt-get install -y sops age
 
-# Linux (example)
-sudo apt install sops age
+# Linux (Fedora/RHEL)
+sudo dnf install -y sops age
+
+# Linux (Arch)
+sudo pacman -S --needed sops age
 ```
 
-## 2) Generate an age key
+```powershell
+# Windows
+winget install --id Mozilla.SOPS -e
+winget install --id FiloSottile.age -e
+```
+
+### Generate age key
 
 ```bash
+# Linux/macOS
 mkdir -p ~/.config/sops/age
 age-keygen -o ~/.config/sops/age/keys.txt
 ```
 
-Show your public key:
-
-```bash
-grep "public key" ~/.config/sops/age/keys.txt
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force "$env:APPDATA\\sops\\age" | Out-Null
+age-keygen -o "$env:APPDATA\\sops\\age\\keys.txt"
 ```
 
-## 3) Initialize envvault
+Use built-in checks:
+
+```bash
+envvault doctor
+envvault setup
+```
+
+## First Project Setup (once per repo)
 
 ```bash
 envvault init
 ```
 
 This creates:
-
 - `envvault.config.json`
 - `envvault.policy.json`
 - `.sops.yaml`
 - `secrets/`
 
-## 4) Configure services
+## Configure Services
 
-Edit `envvault.config.json` and map each service to its output `.env` file.
+Map each service to where decrypted `.env` should be written.
 
-Example:
+Example `envvault.config.json`:
 
 ```json
 {
   "version": 1,
   "secretsDir": "secrets",
+  "cryptoBackend": "auto",
   "services": {
     "api": { "envOutput": "apps/api/.env" },
     "worker": { "envOutput": "apps/worker/.env" }
@@ -86,78 +133,98 @@ Example:
 }
 ```
 
-## 5) Grant access recipients
+## Daily Commands (most users)
 
-Add one or more recipients for each environment/service:
+### Pull secrets
 
 ```bash
-envvault grant --env dev --service api --recipient age1alice...
-envvault grant --env dev --service worker --recipient age1alice...
+envvault pull --env dev
+envvault pull --env dev --service api --confirm
 ```
 
-## 6) Add or edit secrets
+Preview only:
 
 ```bash
-# interactive editor
-envvault edit --env dev --service api
+envvault pull --env dev --service api --plan
+envvault pull --env dev --service api --json
+```
 
-# direct update
+### Compare before writing
+
+```bash
+envvault diff --env dev --service api
+```
+
+### Check drift
+
+```bash
+envvault status --env dev
+```
+
+## Writing Back to Vault (requires system `sops`)
+
+### Edit in editor
+
+```bash
+envvault edit --env dev --service api
+```
+
+### Set one value
+
+```bash
 envvault set --env dev --service api DATABASE_URL=postgres://localhost:5432/app
 ```
 
-## 7) Pull secrets locally
+### Push local `.env` file (service-level)
 
 ```bash
-envvault pull --env dev
-envvault pull --env dev --service api --show-diff
+envvault push --env dev --service api --dry-run
+envvault push --env dev --service api --confirm
 ```
 
-If schema placeholders are generated for missing required keys (for example `__MISSING__`), `pull` keeps an existing local non-empty value instead of overwriting it with the placeholder (default behavior).
+## Monorepo Helpers (recommended)
 
-## 8) Verify setup
+If `.env` files were changed directly and you want envvault config/schema to catch up:
 
 ```bash
-envvault doctor
+envvault refresh --dry-run
+envvault sync --dry-run
+envvault refresh
+```
+
+`.gitignore` helpers:
+
+```bash
+envvault gitignore check
+envvault gitignore fix
+```
+
+## CI (minimal)
+
+```bash
 envvault ci-verify --allow-unsigned
 ```
 
-`ci-verify` also checks for uncommitted `.env*` changes in git status (for example `.env.local`). Use `--allow-dirty-env` only when intentionally bypassing that check.
+`ci-verify` also checks for uncommitted `.env*` changes in git status.
 
-## 9) Team workflow basics
+## Important Safety Behavior (local secrets)
 
-- New developer generates an age key and shares only the public key.
-- Admin grants access with `envvault grant`.
-- Developer runs `git pull && envvault pull --env <env>`.
-- For access removal, run `envvault revoke` and then `envvault rotate`.
+### `localProtection`
 
-## Common first-week commands
+Use `localProtection` to preserve local-only keys (for example `BOT_TOKEN`) during `pull` and to prevent pushing them into encrypted secrets.
 
-```bash
-envvault tui
-envvault pull --env dev
-envvault edit --env dev --service api
-envvault hooks install --type pre-push
-```
+### Placeholder-safe `pull` (default)
 
-## CI payload workflow (special CI key)
+If schema generates a placeholder like `__MISSING__`, `pull` will not overwrite an existing local non-empty value with that placeholder.
 
-Use a dedicated CI key to ship an encrypted dotenv payload to CI (for example via `ENVVAULT_CI_BLOB` secret/variable).
+This is useful when:
+- new developers should see placeholders
+- existing developers already have local working tokens
+- CI receives real values from GitHub secrets
 
-Create payload:
+## Next Steps
 
-```bash
-envvault ci-seal --env dev --service api > ci-api-dev.payload
-```
+1. [Workflows](./WORKFLOWS.md) for team/CI/admin examples
+2. [CLI Reference](./CLI-REFERENCE.md) for all flags
+3. [Configuration](./CONFIGURATION.md) for `localProtection`, `placeholderPolicy`, and backend settings
 
-Decode payload in CI:
-
-```bash
-envvault ci-unseal --payload "$ENVVAULT_CI_BLOB" --out apps/api/.env --validate-dotenv
-```
-
-## Next docs
-
-- [CLI Reference](./CLI-REFERENCE.md)
-- [Configuration](./CONFIGURATION.md)
-- [Workflows](./WORKFLOWS.md)
-- [Security Guide](./SECURITY-GUIDE.md)
