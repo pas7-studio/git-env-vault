@@ -6,6 +6,7 @@ import { editCommand } from './commands/edit.js'
 import { setCommand } from './commands/set.js'
 import { doctorCommand } from './commands/doctor.js'
 import { ciVerifyCommand } from './commands/ci-verify.js'
+import { ciSealCommand, ciUnsealCommand } from './commands/ci-secrets.js'
 import { grantCommand } from './commands/grant.js'
 import { revokeCommand } from './commands/revoke.js'
 import { rotateCommand } from './commands/rotate.js'
@@ -17,8 +18,10 @@ import up from './commands/up.js'
 import { tuiCommand } from './commands/tui.js'
 import { setupCommand } from './commands/setup.js'
 import { gitignoreCommand } from './commands/gitignore.js'
-import { refreshCommand } from './commands/refresh.js'
+import { refreshCommand, syncCommand } from './commands/refresh.js'
 import { diffCommand } from './commands/diff.js'
+import { pushCommand } from './commands/push.js'
+import { statusCommand } from './commands/status.js'
 
 const program = new Command()
 const require = createRequire(import.meta.url)
@@ -38,8 +41,13 @@ program.addCommand(doctorCommand)
 program.addCommand(setupCommand)
 program.addCommand(gitignoreCommand)
 program.addCommand(refreshCommand)
+program.addCommand(syncCommand)
 program.addCommand(diffCommand)
+program.addCommand(pushCommand)
+program.addCommand(statusCommand)
 program.addCommand(ciVerifyCommand)
+program.addCommand(ciSealCommand)
+program.addCommand(ciUnsealCommand)
 
 // Admin commands
 program.addCommand(grantCommand)

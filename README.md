@@ -52,6 +52,26 @@ npm i -D git-env-vault
 npm i -g git-env-vault
 ```
 
+### Run without installing globally (`npx` / `bunx`)
+
+```bash
+# one-off command (npm)
+npx git-env-vault@latest doctor
+npx git-env-vault@latest pull --env dev
+
+# one-off command (Bun)
+bunx git-env-vault@latest doctor
+bunx git-env-vault@latest pull --env dev
+```
+
+Global usage example:
+
+```bash
+npm i -g git-env-vault
+envvault --version
+envvault doctor
+```
+
 ## Install prerequisites by OS (full mode)
 
 Use this if you want the full feature set (`edit`, `set`, `grant`, `revoke`, `updatekeys`, `rotate`).
@@ -192,7 +212,9 @@ envvault tui
 envvault edit --env dev --service api
 envvault pull --env dev
 envvault pull --env dev --service api --confirm
+envvault push --env dev --service api --confirm
 envvault diff --env dev --service api
+envvault status --env dev
 ```
 
 ### 8) CI check
@@ -207,13 +229,25 @@ envvault ci-verify
 
 ```json
 {
-  "cryptoBackend": "auto"
+  "cryptoBackend": "auto",
+  "placeholderPolicy": {
+    "preserveExistingOnPlaceholder": true,
+    "patterns": ["__MISSING__", "CHANGEME*", "*PLACEHOLDER*"]
+  },
+  "localProtection": {
+    "global": ["BOT_TOKEN", "TELEGRAM_BOT_TOKEN"],
+    "services": {
+      "core-bot": ["BOT_TOKEN"]
+    }
+  }
 }
 ```
 
 - `auto` (default): try system `sops` first, then JS fallback for supported commands
 - `system-sops`: require system `sops` binary
 - `js`: force JS backend (basic decrypt/pull only)
+- `placeholderPolicy`: prevents generated placeholder values (for missing required keys) from overwriting an existing local value
+- `localProtection`: preserve selected local-only keys during `pull` / protect during `push`
 
 ### Backend capability matrix
 
@@ -250,9 +284,16 @@ envvault gitignore fix --dry-run
 ```bash
 # preview changes (config/schema only)
 envvault refresh --dry-run
+envvault sync --dry-run   # alias for refresh
 
 # add extra excludes
 envvault refresh --dry-run --exclude "apps/legacy/**"
+
+# smarter service naming (dirname|path|fullpath-slug)
+envvault refresh --dry-run --name-strategy dirname
+
+# merge into existing config/schema instead of replacing
+envvault refresh --dry-run --merge-config --merge-schema
 
 # write config + schema
 envvault refresh
@@ -260,6 +301,11 @@ envvault refresh
 # optional: create encrypted secrets snapshots (requires system SOPS)
 envvault refresh --write-secrets
 ```
+
+Name strategies:
+- `dirname` (default): `apps/core-bot/.env` -> `core-bot`
+- `path`: path-based composite name (safer when many duplicate dir names)
+- `fullpath-slug`: full relative path slug (most collision-resistant)
 
 What `refresh` updates:
 - `envvault.config.json` (`services` map)
@@ -269,11 +315,22 @@ What `refresh` does not do:
 - does not overwrite local `.env` files
 - preserves existing `secretsDir` / `cryptoBackend` config settings
 
+Merge modes:
+- `--merge-config`: keep existing services and merge discovered ones
+- `--merge-schema`: keep existing schema services and merge discovered keys
+
 ### Safe diff + confirm for pull
 
 ```bash
 # preview key changes before writing local .env
 envvault pull --env dev --service api --confirm
+
+# machine-readable preview (no write)
+envvault pull --env dev --service api --plan
+envvault pull --env dev --service api --json
+
+# keep local developer-only token untouched during pull
+envvault pull --env dev --service core-bot --confirm --preserve-local BOT_TOKEN
 
 # non-interactive apply (CI/automation)
 envvault pull --env dev --service api --confirm --yes
@@ -287,17 +344,164 @@ envvault pull --env dev --service api --confirm --unsafe-show-values
 
 By default, diffs show only key names (`added/removed/changed`), not values.
 
+`pull --plan` and `pull --json` are preview-only and do not write files.
+
+### Batch pull (multiple services)
+
+```bash
+# default behavior (when --service is omitted): process all configured services for the env
+envvault pull --env dev
+
+# explicit form (same behavior as above)
+envvault pull --env dev --all-services
+
+# wildcard filter
+envvault pull --env dev --service-pattern "core-*"
+
+# batch preview (no write)
+envvault pull --env dev --service-pattern "core-*" --plan
+envvault pull --env dev --all-services --json
+```
+
+Constraints:
+- use only one of `--service`, `--service-pattern`, or `--all-services`
+- `--json` / `--plan` are recommended for CI/review automation
+
 ### Compare local env vs vault (no write)
 
 ```bash
 envvault diff --env dev --service api
 envvault diff --env dev --service api --unsafe-show-values
+envvault diff --env dev --service api --plan
+envvault diff --env dev --service api --json
 ```
+
+### Push local .env to encrypted secret (service-level)
+
+```bash
+envvault push --env dev --service core-bot --dry-run
+envvault push --env dev --service core-bot --confirm
+envvault push --env dev --service core-bot --confirm --yes
+envvault push --env dev --service core-bot --confirm --preserve-local BOT_TOKEN
+envvault push --env dev --service core-bot --exclude-keys DEBUG,DEV_ONLY_FLAG
+envvault push --env dev --service core-bot --dry-run --json
+```
+
+Notes:
+- `push` requires system `sops` (JS backend is decrypt/pull only)
+- `--preserve-local` and config `localProtection` prevent selected local keys from being pushed into vault
+- `--exclude-keys` removes selected local keys from the sync input before encryption
+
+### Status (drift overview)
+
+```bash
+envvault status --env dev
+envvault status --env dev --service core-bot
+envvault status --env dev --json
+```
+
+`status` compares local `envOutput` files with vault secrets and reports key-level drift counts (`+/-/~`).
 
 ### Non-interactive flags
 
 - `pull --confirm --yes`
 - `set --confirm --yes`
+- `push --confirm --yes`
+
+## CI workflows (special CI key + payloads)
+
+Use a dedicated CI key (for example GitHub Actions secret `ENVVAULT_CI_KEY`) to create a transport payload that CI can decode without direct SOPS usage in the job step.
+
+### Create CI payload (local/dev machine or release bot)
+
+From a vault secret:
+
+```bash
+envvault ci-seal --env dev --service api > ci-api-dev.payload
+```
+
+From a plaintext file:
+
+```bash
+envvault ci-seal --from-file apps/api/.env > ci-api-dev.payload
+```
+
+JSON output (for automation):
+
+```bash
+envvault ci-seal --env dev --service api --json
+```
+
+### Decode CI payload in CI
+
+```bash
+# payload can come from CI secret/variable ENVVAULT_CI_BLOB
+envvault ci-unseal --out apps/api/.env --validate-dotenv
+```
+
+Or pass payload directly:
+
+```bash
+envvault ci-unseal --payload "$ENVVAULT_CI_BLOB" --out apps/api/.env --validate-dotenv
+```
+
+### CI verification
+
+`ci-verify` now also checks for uncommitted `.env*` changes (for example `.env.local`) in git status.
+
+```bash
+envvault ci-verify --allow-unsigned
+
+# bypass dirty .env check only when intentionally needed
+envvault ci-verify --allow-unsigned --allow-dirty-env
+```
+
+Recommended CI secrets:
+- `ENVVAULT_CI_KEY`: symmetric key used by `ci-seal` / `ci-unseal`
+- `ENVVAULT_CI_BLOB`: encrypted payload generated by `ci-seal`
+
+### `localProtection` behavior (important for BOT tokens)
+
+If a key is listed in `localProtection`, then:
+- during `pull`: local value is kept (vault value does not overwrite it)
+- during `push`: local value is not written into encrypted secret
+
+This is useful for developer-specific tokens like `BOT_TOKEN`.
+
+### Placeholder-safe pull behavior (important for local CI/API tokens)
+
+When schema validation adds placeholders for missing required keys (for example `__MISSING__`), `pull` will keep an existing local non-empty value instead of overwriting it with a placeholder.
+
+This is useful when:
+- real values are injected only in CI via GitHub Actions secrets
+- developers already know and configured a local token manually
+- you still want schema-required keys to appear as placeholders for newcomers
+
+Example:
+- vault/schema would produce `BOT_TOKEN=__MISSING__`
+- developer already has `BOT_TOKEN=123...` locally
+- `envvault pull` keeps the local `BOT_TOKEN=123...`
+
+Config example:
+
+```json
+{
+  "placeholderPolicy": {
+    "preserveExistingOnPlaceholder": true,
+    "patterns": ["__MISSING__", "CHANGEME*", "*PLACEHOLDER*", "TODO_*", "<set-me>*"]
+  }
+}
+```
+
+Disable if needed:
+
+```json
+{
+  "placeholderPolicy": {
+    "preserveExistingOnPlaceholder": false
+  }
+}
+```
 
 ## Documentation
 
@@ -316,11 +520,16 @@ envvault diff --env dev --service api --unsafe-show-values
 
 - `envvault init`
 - `envvault pull --env <env> [--service <service>]`
+- `envvault push --env <env> --service <service>`
 - `envvault diff --env <env> --service <service>`
+- `envvault status --env <env> [--service <service>]`
 - `envvault refresh [--dry-run] [--write-secrets]`
+- `envvault sync [--dry-run] [--write-secrets]` (alias for `refresh`)
 - `envvault edit --env <env> --service <service>`
 - `envvault set --env <env> --service <service> KEY=VALUE...`
 - `envvault doctor`
+- `envvault ci-seal`
+- `envvault ci-unseal`
 
 ### Access control
 

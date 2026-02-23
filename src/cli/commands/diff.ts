@@ -15,6 +15,8 @@ export const diffCommand = new Command('diff')
   .description('Compare local envOutput with vault secret (no writes)')
   .requiredOption('--env <env>', 'Environment')
   .requiredOption('--service <service>', 'Service')
+  .option('--plan', 'Print summary plan output')
+  .option('--json', 'Print JSON diff output')
   .option('--unsafe-show-values', 'Show secret values in diff', false)
   .action(async (options) => {
     const cwd = process.cwd()
@@ -53,6 +55,25 @@ export const diffCommand = new Command('diff')
 
     const { data: vaultEnv } = await backend.decrypt(secretPath)
     const diff = diffEnv(localEnv, vaultEnv)
+    const payload = {
+      command: 'diff',
+      env: options.env,
+      service: options.service,
+      summary: {
+        added: diff.added.length,
+        removed: diff.removed.length,
+        changed: diff.changed.length,
+      },
+      diff,
+    }
+    if (options.json) {
+      console.log(JSON.stringify(payload, null, 2))
+      return
+    }
+    if (options.plan) {
+      console.log(`Plan: diff ${options.env}/${options.service}`)
+      console.log(`  +${diff.added.length} -${diff.removed.length} ~${diff.changed.length}`)
+    }
     if (options.unsafeShowValues) {
       console.log(formatUnsafeDiff(diff, localEnv, vaultEnv))
     } else {

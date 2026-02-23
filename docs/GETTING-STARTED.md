@@ -15,6 +15,20 @@ This guide walks you through setting up `git-env-vault` in a new or existing rep
 npm i -D git-env-vault
 ```
 
+Run without installing globally:
+
+```bash
+npx git-env-vault@latest doctor
+bunx git-env-vault@latest doctor
+```
+
+Global install (optional):
+
+```bash
+npm i -g git-env-vault
+envvault --version
+```
+
 Install external tools:
 
 ```bash
@@ -98,12 +112,16 @@ envvault pull --env dev
 envvault pull --env dev --service api --show-diff
 ```
 
+If schema placeholders are generated for missing required keys (for example `__MISSING__`), `pull` keeps an existing local non-empty value instead of overwriting it with the placeholder (default behavior).
+
 ## 8) Verify setup
 
 ```bash
 envvault doctor
 envvault ci-verify --allow-unsigned
 ```
+
+`ci-verify` also checks for uncommitted `.env*` changes in git status (for example `.env.local`). Use `--allow-dirty-env` only when intentionally bypassing that check.
 
 ## 9) Team workflow basics
 
@@ -119,6 +137,22 @@ envvault tui
 envvault pull --env dev
 envvault edit --env dev --service api
 envvault hooks install --type pre-push
+```
+
+## CI payload workflow (special CI key)
+
+Use a dedicated CI key to ship an encrypted dotenv payload to CI (for example via `ENVVAULT_CI_BLOB` secret/variable).
+
+Create payload:
+
+```bash
+envvault ci-seal --env dev --service api > ci-api-dev.payload
+```
+
+Decode payload in CI:
+
+```bash
+envvault ci-unseal --payload "$ENVVAULT_CI_BLOB" --out apps/api/.env --validate-dotenv
 ```
 
 ## Next docs

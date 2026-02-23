@@ -31,6 +31,49 @@ export async function loadConfig(projectDir: string): Promise<EnvVaultConfig> {
       )
     }
 
+    if (config.localProtection !== undefined) {
+      if (typeof config.localProtection !== 'object' || config.localProtection === null) {
+        throw new ConfigError('localProtection must be an object')
+      }
+      if (
+        config.localProtection.global !== undefined &&
+        !Array.isArray(config.localProtection.global)
+      ) {
+        throw new ConfigError('localProtection.global must be an array of strings')
+      }
+      if (
+        config.localProtection.services !== undefined &&
+        (typeof config.localProtection.services !== 'object' ||
+          config.localProtection.services === null)
+      ) {
+        throw new ConfigError('localProtection.services must be an object')
+      }
+    }
+
+    if (config.placeholderPolicy !== undefined) {
+      if (typeof config.placeholderPolicy !== 'object' || config.placeholderPolicy === null) {
+        throw new ConfigError('placeholderPolicy must be an object')
+      }
+      if (
+        config.placeholderPolicy.preserveExistingOnPlaceholder !== undefined &&
+        typeof config.placeholderPolicy.preserveExistingOnPlaceholder !== 'boolean'
+      ) {
+        throw new ConfigError('placeholderPolicy.preserveExistingOnPlaceholder must be a boolean')
+      }
+      if (
+        config.placeholderPolicy.patterns !== undefined &&
+        !Array.isArray(config.placeholderPolicy.patterns)
+      ) {
+        throw new ConfigError('placeholderPolicy.patterns must be an array of strings')
+      }
+      if (
+        Array.isArray(config.placeholderPolicy.patterns) &&
+        config.placeholderPolicy.patterns.some((p) => typeof p !== 'string')
+      ) {
+        throw new ConfigError('placeholderPolicy.patterns must be an array of strings')
+      }
+    }
+
     return config
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -50,6 +93,14 @@ export function getDefaultConfig(): EnvVaultConfig {
     version: 1,
     secretsDir: 'secrets',
     cryptoBackend: 'auto',
+    localProtection: {
+      global: [],
+      services: {},
+    },
+    placeholderPolicy: {
+      preserveExistingOnPlaceholder: true,
+      patterns: ['__MISSING__', 'CHANGEME*', '*PLACEHOLDER*', 'TODO_*', '<set-me>*'],
+    },
     services: {},
   }
 }

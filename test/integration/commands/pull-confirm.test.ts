@@ -1,44 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdir, rm, writeFile, readFile, chmod } from 'fs/promises'
+import { mkdir, rm, writeFile, readFile } from 'fs/promises'
 import { join, resolve } from 'path'
 import { execa } from 'execa'
 import { tmpdir } from 'os'
+import { writeFakeSopsBin, withFakeSopsPath } from '../helpers/fake-sops.js'
 
 const CLI_PATH = resolve(process.cwd(), 'dist/cli/index.js')
-
-async function writeFakeSopsBin(binDir: string): Promise<void> {
-  await mkdir(binDir, { recursive: true })
-    if (process.platform === 'win32') {
-      const cmdPath = join(binDir, 'sops.cmd')
-      const content = `@echo off
-if "%~1"=="--version" (
-  echo sops 3.8.1
-  goto :eof
-)
-if "%~1"=="-d" (
-  type "%~2"
-  goto :eof
-)
-exit /b 1
-`
-    await writeFile(cmdPath, content, 'utf-8')
-  } else {
-    const shPath = join(binDir, 'sops')
-    const content = `#!/bin/sh
-if [ "$1" = "--version" ]; then
-  echo "sops 3.8.1"
-  exit 0
-fi
-if [ "$1" = "-d" ]; then
-  cat "$2"
-  exit 0
-fi
-exit 1
-`
-    await writeFile(shPath, content, 'utf-8')
-    await chmod(shPath, 0o755)
-  }
-}
 
 describe('pull confirm/no-write', () => {
   let testDir: string
@@ -83,10 +50,7 @@ describe('pull confirm/no-write', () => {
   })
 
   function testEnv() {
-    return {
-      ...process.env,
-      PATH: `${fakeBin}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH ?? ''}`,
-    }
+    return withFakeSopsPath(fakeBin)
   }
 
   it('does not write file with --no-write', async () => {

@@ -29,6 +29,16 @@ Example:
 {
   "version": 1,
   "secretsDir": "secrets",
+  "placeholderPolicy": {
+    "preserveExistingOnPlaceholder": true,
+    "patterns": ["__MISSING__", "CHANGEME*", "*PLACEHOLDER*"]
+  },
+  "localProtection": {
+    "global": ["BOT_TOKEN"],
+    "services": {
+      "api": ["TELEGRAM_BOT_TOKEN"]
+    }
+  },
   "services": {
     "api": { "envOutput": "apps/api/.env" },
     "worker": { "envOutput": "apps/worker/.env" }
@@ -46,6 +56,9 @@ Fields:
 - `services` (object, required): service map.
 - `services.<name>.envOutput` (string, required): output `.env` path.
 - `repo.name` (string, optional): stable repo id for local overrides.
+- `localProtection` (object, optional): keys to preserve locally on `pull` and exclude from `push`.
+- `placeholderPolicy.preserveExistingOnPlaceholder` (boolean, optional, default `true`): if `pull` generates a placeholder (e.g. `__MISSING__`) for a required key, keep an existing local non-empty value instead of overwriting it.
+- `placeholderPolicy.patterns` (string[], optional): wildcard patterns used to detect placeholder-like values.
 
 ## `envvault.policy.json`
 
@@ -117,6 +130,11 @@ Use strict validation:
 ```bash
 envvault pull --env dev --strict
 ```
+
+Placeholder-safe local behavior:
+
+- If schema adds `BOT_TOKEN=__MISSING__` and the developer already has `BOT_TOKEN` locally, `pull` keeps the local value by default.
+- This prevents accidental replacement of a working local token with a placeholder.
 
 ## Secret file format
 

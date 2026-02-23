@@ -6,6 +6,14 @@ export interface EnvVaultConfig {
   repo?: {
     name?: string
   }
+  placeholderPolicy?: {
+    preserveExistingOnPlaceholder?: boolean
+    patterns?: string[]
+  }
+  localProtection?: {
+    global?: string[]
+    services?: Record<string, string[]>
+  }
   services: Record<string, { envOutput: string }>
 }
 

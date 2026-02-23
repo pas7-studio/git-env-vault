@@ -8,6 +8,13 @@ This document describes all available `envvault` CLI commands.
 envvault [command] [options]
 ```
 
+Alternative runners:
+
+```bash
+npx git-env-vault@latest [command] [options]
+bunx git-env-vault@latest [command] [options]
+```
+
 Common flags:
 
 - `-h, --help`
@@ -40,11 +47,19 @@ envvault pull --env <env> [options]
 Options:
 
 - `--service <service>`: only one service.
+- `--service-pattern <pattern>`: wildcard filter for multiple services (e.g. `core-*`).
+- `--all-services`: explicitly process all configured services (default behavior).
 - `--dry-run`: print planned actions without writing.
 - `--no-write`: validate/decrypt only.
 - `--strict`: fail when schema required keys are missing.
 - `--backup`: create backup for overwritten `.env` files.
 - `--show-diff`: show safe key-level diff.
+- `--confirm`, `--interactive`: confirm before writing local `.env`.
+- `--yes`: apply without prompt in confirm mode.
+- `--preserve-local <keys>`: keep local values for selected keys.
+- `--select-keys <keys>`: apply only selected changed keys.
+- `--plan`: preview summary only (no write).
+- `--json`: machine-readable preview (no write).
 
 ### `envvault edit`
 
@@ -86,12 +101,46 @@ envvault doctor
 Validate policy/signature and encryption state for CI.
 
 ```bash
-envvault ci-verify [--allow-unsigned]
+envvault ci-verify [--allow-unsigned] [--allow-dirty-env]
 ```
 
 Options:
 
 - `--allow-unsigned`: do not fail if policy signature is missing.
+- `--allow-dirty-env`: do not fail on uncommitted `.env*` git changes.
+
+### `envvault ci-seal`
+
+Create a CI payload encrypted with a dedicated CI key.
+
+```bash
+envvault ci-seal --env <env> --service <service> [options]
+envvault ci-seal --from-file <path> [options]
+```
+
+Options:
+
+- `--key <value>`: CI key inline.
+- `--key-env <name>`: env var with CI key (default `ENVVAULT_CI_KEY`).
+- `--out <path>`: write payload to file.
+- `--json`: print metadata + payload as JSON.
+
+### `envvault ci-unseal`
+
+Decode a CI payload into dotenv/plaintext.
+
+```bash
+envvault ci-unseal [--payload <value> | --payload-env <name>] [options]
+```
+
+Options:
+
+- `--payload <value>`: base64 payload string.
+- `--payload-env <name>`: env var with payload (default `ENVVAULT_CI_BLOB`).
+- `--key <value>` / `--key-env <name>`: CI key source.
+- `--out <path>`: write decoded plaintext to file.
+- `--validate-dotenv`: validate decoded output as dotenv.
+- `--json`: print metadata JSON.
 
 ## Access control
 
@@ -216,6 +265,10 @@ envvault pull --env dev --show-diff
 
 # CI check
 envvault ci-verify --allow-unsigned
+
+# CI payload encode/decode
+envvault ci-seal --env dev --service api > ci-api-dev.payload
+envvault ci-unseal --payload "$ENVVAULT_CI_BLOB" --out apps/api/.env --validate-dotenv
 ```
 
 ## See also

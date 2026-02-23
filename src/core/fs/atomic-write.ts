@@ -135,6 +135,28 @@ async function cleanupTempFile(tempPath: string): Promise<void> {
   }
 }
 
+function isRetryableRenameError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+}
+
+async function renameWithRetry(tempPath: string, filePath: string, maxRetries: number = 5): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await rename(tempPath, filePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableRenameError(error) || attempt === maxRetries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 15 * attempt));
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Atomically write content to a file
  *
@@ -190,7 +212,7 @@ export async function atomicWriteFile(
     await writeFile(tempPath, content, encoding);
 
     // Rename temp to target (atomic on same filesystem)
-    await rename(tempPath, filePath);
+    await renameWithRetry(tempPath, filePath);
 
     const result: AtomicWriteResult = {
       written: true,

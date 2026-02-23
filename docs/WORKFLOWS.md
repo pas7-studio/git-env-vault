@@ -26,6 +26,8 @@ git pull
 envvault pull --env dev
 ```
 
+If schema placeholders are used (for example `__MISSING__` for `BOT_TOKEN`), `pull` keeps an existing local non-empty value instead of overwriting it with the placeholder. This helps when a developer already has a manually provided token.
+
 ## 2) Add a new service
 
 Update config:
@@ -114,11 +116,44 @@ envvault ci-verify
 envvault pull --env prod --no-write
 ```
 
+`ci-verify` fails on uncommitted `.env*` git changes by default (including `.env.local`). This helps catch accidental local secret edits in CI/build agents.
+
 If your pipeline writes runtime files:
 
 ```bash
 envvault pull --env prod
 ```
+
+### CI payload with dedicated CI key (no direct vault secret in CI variable)
+
+Create payload outside CI (developer machine or release automation):
+
+```bash
+envvault ci-seal --env prod --service api > ci-api-prod.payload
+```
+
+Store results in CI:
+- `ENVVAULT_CI_KEY` (secret)
+- `ENVVAULT_CI_BLOB` (secret/variable with payload content)
+
+Decode inside CI job:
+
+```bash
+envvault ci-unseal --out apps/api/.env --validate-dotenv
+```
+
+Using one-off runners:
+
+```bash
+npx git-env-vault@latest ci-unseal --out apps/api/.env --validate-dotenv
+bunx git-env-vault@latest ci-unseal --out apps/api/.env --validate-dotenv
+```
+
+Recommended pattern:
+
+- CI gets real runtime secrets via GitHub Actions `secrets`
+- local developers receive placeholders for missing required values
+- if a developer already configured a local secret, `pull` does not replace it with a placeholder
 
 ## 8) Docker compose project bootstrap
 

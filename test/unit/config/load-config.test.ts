@@ -49,6 +49,10 @@ describe('loadConfig', () => {
         version: 1 as const,
         secretsDir: 'vault',
         cryptoBackend: 'js' as const,
+        localProtection: {
+          global: ['BOT_TOKEN'],
+          services: { api: ['TELEGRAM_BOT_TOKEN'] }
+        },
         services: {}
       }
       await writeFile(join(testDir, 'envvault.config.json'), JSON.stringify(config))
@@ -56,6 +60,24 @@ describe('loadConfig', () => {
       const loaded = await loadConfig(testDir)
       expect(loaded.secretsDir).toBe('vault')
       expect(loaded.cryptoBackend).toBe('js')
+      expect(loaded.localProtection?.global).toEqual(['BOT_TOKEN'])
+    })
+
+    it('should load placeholderPolicy config', async () => {
+      const config = {
+        version: 1 as const,
+        secretsDir: 'secrets',
+        placeholderPolicy: {
+          preserveExistingOnPlaceholder: true,
+          patterns: ['__MISSING__', 'CHANGEME*']
+        },
+        services: {}
+      }
+      await writeFile(join(testDir, 'envvault.config.json'), JSON.stringify(config))
+
+      const loaded = await loadConfig(testDir)
+      expect(loaded.placeholderPolicy?.preserveExistingOnPlaceholder).toBe(true)
+      expect(loaded.placeholderPolicy?.patterns).toEqual(['__MISSING__', 'CHANGEME*'])
     })
   })
 
@@ -112,6 +134,30 @@ describe('loadConfig', () => {
       await expect(loadConfig(testDir)).rejects.toThrow('cryptoBackend must be one of')
     })
 
+    it('should throw ConfigError on invalid localProtection.global type', async () => {
+      await writeFile(
+        join(testDir, 'envvault.config.json'),
+        '{"version":1,"secretsDir":"secrets","localProtection":{"global":"BOT_TOKEN"},"services":{}}'
+      )
+      await expect(loadConfig(testDir)).rejects.toThrow('localProtection.global must be an array')
+    })
+
+    it('should throw ConfigError on invalid placeholderPolicy type', async () => {
+      await writeFile(
+        join(testDir, 'envvault.config.json'),
+        '{"version":1,"secretsDir":"secrets","placeholderPolicy":"bad","services":{}}'
+      )
+      await expect(loadConfig(testDir)).rejects.toThrow('placeholderPolicy must be an object')
+    })
+
+    it('should throw ConfigError on invalid placeholderPolicy.patterns items', async () => {
+      await writeFile(
+        join(testDir, 'envvault.config.json'),
+        '{"version":1,"secretsDir":"secrets","placeholderPolicy":{"patterns":["__MISSING__",1]},"services":{}}'
+      )
+      await expect(loadConfig(testDir)).rejects.toThrow('placeholderPolicy.patterns must be an array of strings')
+    })
+
     it('should throw ConfigError on null services', async () => {
       await writeFile(join(testDir, 'envvault.config.json'), '{"version":1,"secretsDir":"secrets","services":null}')
       await expect(loadConfig(testDir)).rejects.toThrow('services is required')
@@ -126,6 +172,11 @@ describe('getDefaultConfig', () => {
     expect(config.version).toBe(1)
     expect(config.secretsDir).toBe('secrets')
     expect(config.cryptoBackend).toBe('auto')
+    expect(config.localProtection).toEqual({ global: [], services: {} })
+    expect(config.placeholderPolicy).toEqual({
+      preserveExistingOnPlaceholder: true,
+      patterns: ['__MISSING__', 'CHANGEME*', '*PLACEHOLDER*', 'TODO_*', '<set-me>*'],
+    })
     expect(config.services).toEqual({})
   })
 
